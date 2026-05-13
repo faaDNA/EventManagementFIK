@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS events (
                             'completed','cancelled'
                           )),
   has_presensi            BOOLEAN DEFAULT FALSE,
+  target_audience         TEXT DEFAULT 'semua' CHECK (target_audience IN ('semua', 'mahasiswa')),
   created_at              TIMESTAMPTZ DEFAULT NOW(),
   updated_at              TIMESTAMPTZ DEFAULT NOW()
 );

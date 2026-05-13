@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router";
 import { GlassCard } from "../../glass-card";
 import { useAuth } from "../../auth-context";
 import { ImageWithFallback } from "../../figma/ImageWithFallback";
-import { Calendar, MapPin, Users, ArrowLeft, CheckCircle2, Clock, Tag, CalendarX, Loader2, QrCode, FileText, ScanLine, Trash2 } from "lucide-react";
+import { Calendar, MapPin, Users, ArrowLeft, CheckCircle2, Clock, Tag, CalendarX, Loader2, QrCode, FileText, ScanLine, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import type { Event } from "../../../../lib/database.types";
 
 function formatDateRange(date: string, endDate?: string | null) {
@@ -12,6 +12,41 @@ function formatDateRange(date: string, endDate?: string | null) {
   if (!endDate || endDate === date) return start;
   const end = new Date(endDate).toLocaleDateString("id-ID", opts);
   return `${start} – ${end}`;
+}
+
+function formatTimeAMPM(start?: string | null, end?: string | null) {
+  const format = (t: string) => {
+    const [h, m] = t.split(":");
+    let hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12; 
+    return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+  };
+  if (!start) return "";
+  const s = format(start);
+  if (!end) return s;
+  return `${s} - ${format(end)}`;
+}
+
+const DESC_MAX = 300;
+function DescriptionCard({ text }: { text: string | null }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const desc = text || "Belum ada deskripsi.";
+  const isLong = desc.length > DESC_MAX;
+  return (
+    <GlassCard className="p-5">
+      <h2 className="text-base font-bold text-foreground mb-2">Deskripsi</h2>
+      <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+        {isLong && !expanded ? desc.slice(0, DESC_MAX) + "..." : desc}
+      </p>
+      {isLong && (
+        <button onClick={() => setExpanded(!expanded)} className="mt-2 text-xs font-semibold text-[#ff6900] hover:underline flex items-center gap-1">
+          {expanded ? <><ChevronUp className="w-3.5 h-3.5" /> Sembunyikan</> : <><ChevronDown className="w-3.5 h-3.5" /> Selengkapnya</>}
+        </button>
+      )}
+    </GlassCard>
+  );
 }
 
 interface EventWithOrmawa extends Event {
@@ -154,7 +189,7 @@ export function DashboardEventDetail() {
   if (!event) return <div className="p-6 text-center text-muted-foreground">Event tidak ditemukan</div>;
 
   const isStudentOrPublic = profile?.role === "mahasiswa" || profile?.role === "umum";
-  const timeStr = [event.time_start, event.time_end].filter(Boolean).join(" - ");
+  const timeStr = formatTimeAMPM(event.time_start, event.time_end);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -171,7 +206,7 @@ export function DashboardEventDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="relative rounded-2xl overflow-hidden h-56 md:h-72">
+          <div className="relative rounded-2xl overflow-hidden aspect-video w-full md:aspect-auto md:h-72">
             {event.cover_url ? (
               <ImageWithFallback src={event.cover_url} alt={event.title} className="w-full h-full object-cover" />
             ) : (
@@ -182,35 +217,67 @@ export function DashboardEventDetail() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4">
               <div className="flex gap-2 mb-2">
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                  (event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) ? "bg-red-500/80 text-white" :
-                  event.status === "published" ? "bg-[#ff6900]/80 text-white" :
-                  event.status === "ongoing" ? "bg-emerald-500/80 text-white" :
-                  "bg-white/20 text-white/70"
-                }`}>
-                  {(event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) ? "Ditutup" :
-                   event.status === "published" ? "Dibuka" : event.status === "ongoing" ? "Berlangsung" : "Selesai"}
-                </span>
+                {(() => {
+                  let isOngoingDate = false;
+                  if (event.date) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const start = new Date(event.date);
+                    start.setHours(0, 0, 0, 0);
+                    const end = event.end_date ? new Date(event.end_date) : new Date(start);
+                    end.setHours(0, 0, 0, 0);
+                    if (today >= start && today <= end) {
+                      isOngoingDate = true;
+                    }
+                  }
+                  const isActuallyOngoing = isOngoingDate && event.status !== "completed" && event.status !== "draft" && event.status !== "cancelled";
+
+                  const isOprec = event.category === "Oprec";
+                  const isClosed = (event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) || (event.quota !== null && registrationsCount >= event.quota);
+                  
+                  let text = event.status;
+                  let bg = "bg-white/20 text-white/70";
+                  
+                  if (isActuallyOngoing && !isOprec) {
+                    text = "Berlangsung";
+                    bg = "bg-emerald-500/80 text-white";
+                  } else if (isClosed && event.status === "published") {
+                    text = "Ditutup";
+                    bg = "bg-red-500/80 text-white";
+                  } else if (event.status === "published") {
+                    text = "Dibuka";
+                    bg = "bg-[#ff6900]/80 text-white";
+                  } else if (event.status === "ongoing") {
+                    text = isOprec ? "Dibuka" : "Berlangsung";
+                    bg = isOprec ? "bg-[#ff6900]/80 text-white" : "bg-emerald-500/80 text-white";
+                  } else if (event.status === "completed") {
+                    text = "Selesai";
+                    bg = "bg-zinc-500/80 text-white";
+                  }
+                  
+                  return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${bg}`}>
+                      {text}
+                    </span>
+                  );
+                })()}
                 {event.category && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/15 text-white/90 backdrop-blur-md">{event.category}</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/95 text-zinc-900 shadow-sm">{event.category}</span>
                 )}
               </div>
               <h1 className="text-xl md:text-2xl font-bold text-white">{event.title}</h1>
             </div>
           </div>
 
-          <GlassCard className="p-5">
-            <h2 className="text-base font-bold text-foreground mb-2">Deskripsi</h2>
-            <p className="text-muted-foreground text-sm leading-relaxed">{event.description || "Belum ada deskripsi."}</p>
-          </GlassCard>
+          <DescriptionCard text={event.description} />
         </div>
 
         <div className="space-y-4">
           <GlassCard className="p-5 space-y-4">
             {[
               { icon: <Tag className="w-4 h-4 text-[#ff6900]" />, label: "Penyelenggara", value: event.ormawa?.name || "—" },
-              { icon: <Calendar className="w-4 h-4 text-[#ff6900]" />, label: "Tanggal", value: formatDateRange(event.date, event.end_date), sub: timeStr || undefined },
-              ...(event.location ? [{ icon: <MapPin className="w-4 h-4 text-[#ff6900]" />, label: "Lokasi", value: event.location }] : []),
+              ...(event.category !== "Oprec" ? [{ icon: <Calendar className="w-4 h-4 text-[#ff6900]" />, label: "Tanggal", value: formatDateRange(event.date, event.end_date), sub: timeStr || undefined }] : []),
+              ...(event.category !== "Oprec" && event.location ? [{ icon: <MapPin className="w-4 h-4 text-[#ff6900]" />, label: "Lokasi", value: event.location }] : []),
               { icon: <CalendarX className="w-4 h-4 text-red-400" />, label: "Pendaftaran Ditutup", value: event.registration_close_date ? new Date(event.registration_close_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "—" },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -225,6 +292,19 @@ export function DashboardEventDetail() {
             <div className="flex items-center gap-3">
               <Users className="w-4 h-4 text-[#ff6900]" />
               <div>
+                <p className="text-[11px] text-muted-foreground">Target Peserta</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                  (event as any).target_audience === "mahasiswa"
+                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20"
+                    : "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20"
+                }`}>
+                  {(event as any).target_audience === "mahasiswa" ? "Mahasiswa" : "Umum & Mahasiswa"}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Users className="w-4 h-4 text-[#ff6900]" />
+              <div>
                 <p className="text-[11px] text-muted-foreground">Kuota</p>
                 <p className="text-sm font-medium text-foreground">{event.quota ? `${registrationsCount}/${event.quota}` : "Tidak terbatas"}</p>
               </div>
@@ -236,13 +316,13 @@ export function DashboardEventDetail() {
               </div>
             ) : isStudentOrPublic ? (
               (event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) ? (
-                <button disabled className="w-full py-3 rounded-xl bg-muted text-muted-foreground font-semibold cursor-not-allowed border border-border">
+                <div className="py-3 text-center rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 font-semibold text-sm">
                   Pendaftaran Ditutup
-                </button>
-              ) : (event.quota !== null && registrantCount >= event.quota) ? (
-                <button disabled className="w-full py-3 rounded-xl bg-muted text-muted-foreground font-semibold cursor-not-allowed border border-border">
-                  Kuota Penuh
-                </button>
+                </div>
+              ) : (event.quota !== null && registrationsCount >= event.quota) ? (
+                <div className="py-3 text-center rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 font-semibold text-sm">
+                  Pendaftaran Ditutup
+                </div>
               ) : (
                 <button onClick={() => navigate(`/dashboard/event/${event.id}/daftar`)} className="w-full py-3 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white font-semibold hover:opacity-90 transition shadow-md shadow-[#ff6900]/20">
                   Daftar Event
@@ -251,7 +331,9 @@ export function DashboardEventDetail() {
             ) : null}
           </GlassCard>
 
-          {sessions.length === 0 ? (
+          {fromKegiatanSaya && (
+            <>
+            {sessions.length === 0 ? (
             <GlassCard className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
                 <Clock className="w-4 h-4" />
@@ -292,6 +374,8 @@ export function DashboardEventDetail() {
                 );
               })}
             </GlassCard>
+          )}
+            </>
           )}
         </div>
       </div>

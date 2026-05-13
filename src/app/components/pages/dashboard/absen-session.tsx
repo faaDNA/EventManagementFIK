@@ -419,10 +419,15 @@ export function AbsenSession() {
         }
       } else {
         const errText = await res.text();
-        if (errText.includes("duplicate") || res.status === 409) {
+        if (errText.includes("duplicate") || errText.includes("23505") || res.status === 409) {
+          // User already attended — treat as success
           setSubmitted(true);
+          if (profile?.email && sessionId) {
+            localStorage.removeItem(`draft-absen-${sessionId}-${profile.email}`);
+          }
         } else {
           console.error("Form submit error:", errText);
+          alert("Gagal melakukan presensi. Silakan coba lagi.");
         }
       }
     } catch (err) {
@@ -507,7 +512,7 @@ export function AbsenSession() {
             </GlassCard>
           ) : (
             <GlassCard className="p-0 overflow-hidden">
-              <div className="relative bg-black aspect-square max-h-[400px] flex items-center justify-center overflow-hidden">
+              <div className="relative bg-black aspect-square md:aspect-video max-h-[400px] md:max-h-[500px] w-full flex items-center justify-center overflow-hidden">
                 {cameraActive ? (
                   <>
                     <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />

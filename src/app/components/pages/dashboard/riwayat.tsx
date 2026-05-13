@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
 import { useAuth } from "../../auth-context";
-import { ImageWithFallback } from "../../figma/ImageWithFallback";
-import { Calendar, MapPin, Users, CheckCircle2, Search, Filter, X, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Users, Search, Filter, X, Clock, ArrowRight } from "lucide-react";
+import { SimplePagination } from "../../simple-pagination";
+import { EventListSkeletonList } from "../../loading-skeleton";
 
 function formatDateRange(date: string, endDate?: string | null) {
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
@@ -11,6 +12,21 @@ function formatDateRange(date: string, endDate?: string | null) {
   if (!endDate || endDate === date) return start;
   const end = new Date(endDate).toLocaleDateString("id-ID", opts);
   return `${start} – ${end}`;
+}
+
+function formatTimeAMPM(start?: string | null, end?: string | null) {
+  const format = (t: string) => {
+    const [h, m] = t.split(":");
+    let hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12; 
+    return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+  };
+  if (!start) return "";
+  const s = format(start);
+  if (!end) return s;
+  return `${s} - ${format(end)}`;
 }
 
 export function DashboardRiwayat() {
@@ -22,6 +38,8 @@ export function DashboardRiwayat() {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [completedEvents, setCompletedEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     async function fetchHistory() {
@@ -75,7 +93,7 @@ export function DashboardRiwayat() {
   }, [profile, session]);
 
   const filtered = completedEvents.filter((e) => {
-    const ormawaName = e.ormawa_name || profile?.ormawa_name || "";
+    const ormawaName = e.ormawa_name || (profile as any)?.ormawa_name || "";
     const matchSearch = !search || e.title.toLowerCase().includes(search.toLowerCase()) || ormawaName.toLowerCase().includes(search.toLowerCase());
     
     let matchDate = true;
@@ -95,6 +113,10 @@ export function DashboardRiwayat() {
     
     return matchSearch && matchDate;
   });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const hasFilters = dateFrom || dateTo;
 
@@ -170,45 +192,67 @@ export function DashboardRiwayat() {
       )}
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#ff6900]" />
-          <p className="text-sm">Memuat riwayat kegiatan...</p>
-        </div>
+        <EventListSkeletonList count={6} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <p>{completedEvents.length === 0 ? "Belum ada kegiatan yang selesai" : "Tidak ada kegiatan ditemukan"}</p>
         </div>
       ) : (
+        <>
         <div className="space-y-4">
-          {filtered.map((event) => (
-            <GlassCard key={event.id} onClick={() => navigate(profile?.role === "ormawa" ? `/dashboard/kegiatan-kami/${event.id}` : `/dashboard/event/${event.id}`)} className="p-0 overflow-hidden cursor-pointer group hover:border-[#ff6900]/40 hover:shadow-lg hover:shadow-[#ff6900]/5 transition-all duration-300">
-              <div className="flex flex-col md:flex-row">
-                <div className="w-full md:w-44 h-28 md:h-auto shrink-0 relative overflow-hidden">
-                  <ImageWithFallback src={event.cover_url} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                </div>
-                <div className="flex-1 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold mb-1.5 bg-muted text-muted-foreground">
+          {paginated.map((event) => (
+            <GlassCard key={event.id} onClick={() => navigate(profile?.role === "ormawa" ? `/dashboard/kegiatan-kami/${event.id}` : `/dashboard/event/${event.id}`)} className="p-5 cursor-pointer group hover:border-[#ff6900]/40 hover:shadow-lg hover:shadow-[#ff6900]/5 transition-all duration-300">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex gap-4 flex-1">
+                  {event.cover_url && (
+                    <img src={event.cover_url} alt="" className="w-20 h-14 rounded-xl object-cover shrink-0 hidden sm:block" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-muted text-muted-foreground">
                         Selesai
                       </span>
-                      <h3 className="text-sm font-bold text-foreground group-hover:text-[#ff6900] transition-colors duration-200">{event.title}</h3>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1.5">
-                        <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatDateRange(event.date, event.end_date)}</div>
-                        {event.location && <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{event.location}</div>}
-                        <div className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{event.registrations_count}{event.quota ? `/${event.quota}` : ""} peserta</div>
-                      </div>
+                      {event.category && (
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-muted text-muted-foreground">
+                          {event.category}
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                        (event as any).target_audience === "mahasiswa"
+                          ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20"
+                          : "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20"
+                      }`}>
+                        {(event as any).target_audience === "mahasiswa" ? "Mahasiswa" : "Umum & Mahasiswa"}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted shrink-0">
-                      <CheckCircle2 className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-[11px] text-muted-foreground font-medium">Selesai</span>
+                    <h3 className="text-sm font-bold text-foreground group-hover:text-[#ff6900] transition truncate">{event.title}</h3>
+                    <div className="flex flex-col gap-1.5 text-xs text-muted-foreground mt-1.5">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        {event.date && <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatDateRange(event.date, event.end_date)}</div>}
+                        {event.location && <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{event.location}</div>}
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" />
+                          {event.registrations_count}{event.quota ? `/${event.quota}` : ""} peserta
+                        </div>
+                      </div>
+                      {event.time_start && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          {formatTimeAMPM(event.time_start, event.time_end)}
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#ff6900] group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
             </GlassCard>
           ))}
         </div>
+        <SimplePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

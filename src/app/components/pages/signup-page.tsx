@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router";
+import React, { useState } from "react";
+import { Link } from "react-router";
 import { useAuth } from "../auth-context";
 import { GlassCard } from "../glass-card";
 import {
@@ -12,7 +12,6 @@ type Step = "email" | "profile" | "password";
 
 export function SignupPage() {
   const { signUp } = useAuth();
-  const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -277,22 +276,11 @@ export function SignupPage() {
                   onClick={() => setShowPw(!showPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
-              {password.length > 0 && (
-                <div className="flex gap-1 mt-2">
-                  {[1, 2, 3, 4].map((level) => (
-                    <div
-                      key={level}
-                      className={`h-1 flex-1 rounded-full transition ${
-                        password.length >= level * 3
-                          ? level <= 2 ? "bg-red-400" : level === 3 ? "bg-yellow-400" : "bg-emerald-400"
-                          : "bg-muted"
-                      }`}
-                    />
-                  ))}
-                </div>
+              {password.length > 0 && password.length < 6 && (
+                <p className="text-xs text-red-500 mt-1">Password minimal 6 karakter</p>
               )}
             </div>
 
@@ -311,7 +299,7 @@ export function SignupPage() {
                   onClick={() => setShowConfirmPw(!showConfirmPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showConfirmPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
               {confirmPw && password !== confirmPw && (

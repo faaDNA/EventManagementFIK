@@ -166,6 +166,7 @@ export interface Event {
   registration_message: string | null;
   status: EventStatus;
   has_presensi: boolean;
+  target_audience: "semua" | "mahasiswa";
   created_at: string;
   updated_at: string;
 }

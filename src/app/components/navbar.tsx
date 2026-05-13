@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "./auth-context";
 import { useTheme } from "./theme-context";
-import { Flame, Menu, X, LogOut, ChevronDown, Sun, Moon } from "lucide-react";
+import { Flame, Menu, X, LogOut, ChevronDown, Sun, Moon, User, LayoutDashboard } from "lucide-react";
 
 export function Navbar() {
   const { profile, signOut } = useAuth();
@@ -16,7 +16,7 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+    <nav className="sticky top-0 z-50 border-b border-border bg-white dark:bg-[#0a0a0f] backdrop-blur-xl" style={{ backgroundColor: 'var(--background)' }}>
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#ff6900] to-[#ff8c3a] flex items-center justify-center">
@@ -31,15 +31,27 @@ export function Navbar() {
             <Link
               key={item.path}
               to={item.path}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
                 location.pathname === item.path
-                  ? "bg-[#ff6900]/10 text-[#ff6900]"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  ? "bg-[#ff6900]/10 text-[#ff6900] border-[#ff6900]/20"
+                  : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted border-border shadow-sm"
               }`}
             >
               {item.label}
             </Link>
           ))}
+          {profile && (
+            <Link
+              to="/dashboard"
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                location.pathname.startsWith("/dashboard")
+                  ? "bg-[#ff6900]/10 text-[#ff6900] border-[#ff6900]/20"
+                  : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted border-border shadow-sm"
+              }`}
+            >
+              Dashboard
+            </Link>
+          )}
         </div>
 
         <div className="hidden md:flex items-center gap-2">
@@ -50,9 +62,6 @@ export function Navbar() {
 
           {profile ? (
             <div className="flex items-center gap-2">
-              <Link to="/dashboard" className="px-4 py-2 rounded-xl bg-muted border border-border text-foreground text-sm font-medium hover:bg-accent transition">
-                Dashboard
-              </Link>
               <div className="relative">
                 <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted border border-border hover:bg-accent transition">
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#ff6900] to-[#ff8c3a] flex items-center justify-center text-xs text-white font-bold">
@@ -72,6 +81,12 @@ export function Navbar() {
                         </p>
                         {profile.nim && <p className="text-xs text-muted-foreground">NIM: {profile.nim}</p>}
                       </div>
+                      <Link to="/dashboard" onClick={() => setDropdownOpen(false)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-muted transition mb-1">
+                        <LayoutDashboard className="w-4 h-4" /> Dashboard
+                      </Link>
+                      <Link to="/dashboard/profil" onClick={() => setDropdownOpen(false)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-muted transition mb-1">
+                        <User className="w-4 h-4" /> Profil Saya
+                      </Link>
                       <button onClick={() => { signOut(); setDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition">
                         <LogOut className="w-4 h-4" /> Logout
                       </button>
@@ -104,7 +119,7 @@ export function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-xl p-4 space-y-2">
+        <div className="absolute top-full left-0 right-0 md:hidden border-b border-border p-4 space-y-2 shadow-xl" style={{ backgroundColor: 'var(--background)' }}>
           {navItems.map((item) => (
             <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}
               className={`block px-4 py-3 rounded-xl text-sm font-medium ${location.pathname === item.path ? "bg-[#ff6900]/10 text-[#ff6900]" : "text-muted-foreground"}`}>
@@ -122,14 +137,28 @@ export function Navbar() {
             </div>
           )}
           {profile && (
-            <>
-              <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-xl text-sm font-medium bg-[#ff6900]/10 text-[#ff6900] text-center">
-                Dashboard
-              </Link>
-              <button onClick={() => { signOut(); setMobileOpen(false); }} className="w-full px-4 py-3 rounded-xl text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 text-left">
-                Logout
-              </button>
-            </>
+            <div className="pt-2 border-t border-border mt-2">
+              <div className="flex items-center gap-3 px-4 py-3 mb-2 bg-muted/50 rounded-xl border border-border">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ff6900] to-[#ff8c3a] flex items-center justify-center text-sm text-white font-bold shrink-0">
+                  {profile.full_name[0]}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-foreground truncate">{profile.full_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-[#ff6900]/10 text-[#ff6900]">
+                  Dashboard
+                </Link>
+                <Link to="/dashboard/profil" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-foreground hover:bg-muted border border-transparent">
+                  <User className="w-4 h-4" /> Profil Saya
+                </Link>
+                <button onClick={() => { signOut(); setMobileOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 text-left border border-transparent transition">
+                  <LogOut className="w-4 h-4" /> Logout
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

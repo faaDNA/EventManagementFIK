@@ -3,16 +3,33 @@ import { useNavigate } from "react-router";
 import { GlassCard } from "../glass-card";
 import { Search, Calendar, MapPin, Users, ArrowRight, Sparkles, Star, TrendingUp, CalendarX, Filter, Loader2 } from "lucide-react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
+import { useAuth } from "../auth-context";
 import { formatDateRange } from "../utils";
+
+function formatTimeAMPM(start?: string | null, end?: string | null) {
+  const format = (t: string) => {
+    const [h, m] = t.split(":");
+    let hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12; 
+    return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+  };
+  if (!start) return "";
+  const s = format(start);
+  if (!end) return s;
+  return `${s} - ${format(end)}`;
+}
 
 const CATEGORIES = ["Semua", "Seminar", "Workshop", "Kompetisi", "Oprec", "Pelatihan"];
 
 export function HomePage() {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("Semua");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["Semua"]);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   useEffect(() => {
     async function fetchEvents() {
@@ -39,7 +56,7 @@ export function HomePage() {
             let uiStatus = e.status;
             if (e.status === "published") {
               uiStatus = "upcoming";
-              if (e.registration_close_date && new Date(e.registration_close_date) < new Date()) {
+              if (e.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(e.registration_close_date)) {
                 uiStatus = "closed";
               }
             }
@@ -50,14 +67,15 @@ export function HomePage() {
               category: e.category,
               date: e.date,
               endDate: e.end_date,
-              time: (e.time_start && e.time_end) ? `${e.time_start.slice(0,5)} - ${e.time_end.slice(0,5)} WIB` : "",
+              time: formatTimeAMPM(e.time_start, e.time_end),
               location: e.location,
               quota: e.quota,
               registered: count,
               ormawa: e.ormawa?.name || "Unknown Ormawa",
               cover: e.cover_url,
               status: uiStatus,
-              registrationCloseDate: e.registration_close_date
+              registrationCloseDate: e.registration_close_date,
+              target_audience: e.target_audience || "semua"
             };
           }));
           
@@ -73,8 +91,17 @@ export function HomePage() {
 
   const filtered = events.filter((e) => {
     const matchSearch = e.title.toLowerCase().includes(search.toLowerCase()) || e.ormawa.toLowerCase().includes(search.toLowerCase());
-    const matchCat = category === "Semua" || e.category === category;
+    const matchCat = selectedCategories.includes("Semua") || selectedCategories.includes(e.category);
+    // Logged-in umum can only see 'semua' events
+    if (profile?.role === "umum" && e.target_audience === "mahasiswa") return false;
     return matchSearch && matchCat;
+  }).sort((a, b) => {
+    // Closed/full events go to bottom
+    const aIsClosed = a.status === "closed" || (a.quota && a.registered >= a.quota);
+    const bIsClosed = b.status === "closed" || (b.quota && b.registered >= b.quota);
+    if (aIsClosed && !bIsClosed) return 1;
+    if (!aIsClosed && bIsClosed) return -1;
+    return 0;
   });
 
   return (
@@ -113,19 +140,35 @@ export function HomePage() {
       <section className="max-w-7xl mx-auto px-4 mb-8">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
           <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition ${
-                category === cat
-                  ? "bg-[#ff6900] text-white shadow-md shadow-[#ff6900]/25"
-                  : "bg-muted text-muted-foreground hover:bg-accent border border-border"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          {CATEGORIES.map((cat) => {
+            const isSelected = selectedCategories.includes(cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => {
+                  if (cat === "Semua") {
+                    setSelectedCategories(["Semua"]);
+                  } else {
+                    let next = selectedCategories.filter(c => c !== "Semua");
+                    if (next.includes(cat)) {
+                      next = next.filter(c => c !== cat);
+                      if (next.length === 0) next = ["Semua"];
+                    } else {
+                      next.push(cat);
+                    }
+                    setSelectedCategories(next);
+                  }
+                }}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  isSelected
+                    ? "bg-[#ff6900] text-white shadow-md shadow-[#ff6900]/25"
+                    : "bg-muted text-muted-foreground hover:bg-accent border border-border"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -144,14 +187,25 @@ export function HomePage() {
                 <ImageWithFallback src={event.cover} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                 <div className="absolute top-3 left-3 flex gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md ${
-                    event.status === "upcoming" ? "bg-[#ff6900]/80 text-white" :
-                    event.status === "closed" ? "bg-red-500/80 text-white" :
-                    "bg-emerald-500/80 text-white"
-                  }`}>
-                    {event.status === "upcoming" ? "Akan Datang" : event.status === "closed" ? "Ditutup" : "Berlangsung"}
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-white/80 backdrop-blur-md">
+                  {(() => {
+                    const isOprec = event.category === "Oprec";
+                    const isClosed = event.status === "closed" || (event.quota && event.registered >= event.quota);
+                    
+                    let text = isClosed ? "Ditutup" : event.status === "upcoming" ? "Dibuka" : "Berlangsung";
+                    let bg = isClosed ? "bg-red-500/80" : event.status === "upcoming" ? "bg-[#ff6900]/80" : "bg-emerald-500/80";
+                    
+                    if (isOprec && event.status !== "closed" && !isClosed) {
+                      text = "Dibuka";
+                      bg = "bg-[#ff6900]/80";
+                    }
+
+                    return (
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md text-white ${bg}`}>
+                        {text}
+                      </span>
+                    );
+                  })()}
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/95 text-zinc-900 shadow-sm">
                     {event.category}
                   </span>
                 </div>
@@ -164,17 +218,21 @@ export function HomePage() {
               <div className="p-5">
                 <h3 className="text-base font-bold text-foreground mb-2 line-clamp-2 group-hover:text-[#ff6900] transition">{event.title}</h3>
                 <div className="space-y-1.5 mb-4">
-                  {(event.date || event.time) && (
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                      <Calendar className="w-3.5 h-3.5 shrink-0" />
-                      <span>{event.date ? formatDateRange(event.date, event.endDate) : ""}{event.date && event.time ? " | " : ""}{event.time}</span>
-                    </div>
-                  )}
-                  {event.location && (
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      <span>{event.location}</span>
-                    </div>
+                  {event.category !== "Oprec" && (
+                    <>
+                      {(event.date || event.time) && (
+                        <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                          <Calendar className="w-3.5 h-3.5 shrink-0" />
+                          <span>{event.date ? formatDateRange(event.date, event.endDate) : ""}{event.date && event.time ? " | " : ""}{event.time}</span>
+                        </div>
+                      )}
+                      {event.location && (
+                        <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                          <span>{event.location}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                   {event.registrationCloseDate && (
                     <div className="flex items-center gap-2 text-xs">
@@ -184,11 +242,23 @@ export function HomePage() {
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{event.registered}/{event.quota}</span>
-                    <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a]" style={{ width: `${(event.registered / event.quota) * 100}%` }} />
+                  <div className="flex flex-col gap-1.5">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border w-fit ${
+                      event.target_audience === "mahasiswa"
+                        ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20"
+                        : "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20"
+                    }`}>
+                      {event.target_audience === "mahasiswa" ? "Mahasiswa" : "Umum & Mahasiswa"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {event.quota ? `Kuota: ${event.registered}/${event.quota}` : `${event.registered} pendaftar`}
+                      </span>
+                      {event.quota ? (
+                        <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a]" style={{ width: `${(event.registered / event.quota) * 100}%` }} />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#ff6900] group-hover:translate-x-1 transition-all" />

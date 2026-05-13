@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { MONTHLY_STATS, EVENTS } from "../mock-data";
+
 import { GlassCard } from "../glass-card";
 import { useAuth } from "../auth-context";
 import { useTheme } from "../theme-context";
 import { useNavigate } from "react-router";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
 import { Users, Calendar, TrendingUp, Award, Download, Plus, Building2, Activity, Loader2, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabase";
@@ -35,9 +35,108 @@ export function BEMDashboard() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [ormawaList, setOrmawaList] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalKegiatan: 0,
+    kegiatanBulanIni: 0,
+    totalPendaftar: 0,
+    pendaftarBulanIni: 0,
+    totalHadir: 0,
+    hadirBulanIni: 0,
+    persentaseHadir: 0,
+    persentaseHadirBulanIni: 0,
+  });
+  const [monthlyChart, setMonthlyChart] = useState<any[]>([]);
+
+  const fetchDashboardStats = async () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    interface MonthBucket { month: string; year: number; monthNum: number; mahasiswa: number; umum: number; events: number; }
+    const last12Months: MonthBucket[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      last12Months.push({
+        month: months[d.getMonth()],
+        year: d.getFullYear(),
+        monthNum: d.getMonth(),
+        mahasiswa: 0,
+        umum: 0,
+        events: 0,
+      });
+    }
+
+    const { data: events } = await supabase.from("events").select("created_at") as { data: { created_at: string }[] | null };
+    let totalKegiatan = 0;
+    let kegiatanBulanIni = 0;
+
+    if (events) {
+      totalKegiatan = events.length;
+      events.forEach(e => {
+        const d = new Date(e.created_at);
+        if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+          kegiatanBulanIni++;
+        }
+        const mObj = last12Months.find(m => m.monthNum === d.getMonth() && m.year === d.getFullYear());
+        if (mObj) mObj.events++;
+      });
+    }
+
+    const { data: regs } = await supabase.from("event_registrations").select(`
+      created_at,
+      status,
+      profiles ( role )
+    `);
+
+    let totalPendaftar = 0;
+    let pendaftarBulanIni = 0;
+    let totalHadir = 0;
+    let hadirBulanIni = 0;
+
+    if (regs) {
+      totalPendaftar = regs.length;
+      regs.forEach((r: any) => {
+        const d = new Date(r.created_at);
+        const isThisMonth = d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const isHadir = r.status === 'hadir';
+        const role = Array.isArray(r.profiles) ? r.profiles[0]?.role : r.profiles?.role;
+
+        if (isThisMonth) {
+          pendaftarBulanIni++;
+          if (isHadir) hadirBulanIni++;
+        }
+        if (isHadir) totalHadir++;
+
+        const mObj = last12Months.find(m => m.monthNum === d.getMonth() && m.year === d.getFullYear());
+        if (mObj) {
+          if (role === 'mahasiswa') mObj.mahasiswa++;
+          else mObj.umum++;
+        }
+      });
+    }
+
+    setStats({
+      totalKegiatan,
+      kegiatanBulanIni,
+      totalPendaftar,
+      pendaftarBulanIni,
+      totalHadir,
+      hadirBulanIni,
+      persentaseHadir: totalPendaftar ? Math.round((totalHadir / totalPendaftar) * 100) : 0,
+      persentaseHadirBulanIni: pendaftarBulanIni ? Math.round((hadirBulanIni / pendaftarBulanIni) * 100) : 0,
+    });
+    
+    setMonthlyChart(last12Months.map(m => ({
+      month: m.month,
+      mahasiswa: m.mahasiswa,
+      umum: m.umum,
+      events: m.events
+    })));
+  };
 
   const fetchOrmawa = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("ormawa")
       .select("*, events(count)")
       .order("created_at", { ascending: false });
@@ -53,6 +152,7 @@ export function BEMDashboard() {
 
   useEffect(() => {
     fetchOrmawa();
+    fetchDashboardStats();
   }, []);
 
   const handleAddOrmawa = async () => {
@@ -60,6 +160,10 @@ export function BEMDashboard() {
     setSuccessMsg("");
     if (!newOrmawa.name || !newOrmawa.fullName || !newOrmawa.email || !newOrmawa.password) {
       setError("Semua field wajib diisi");
+      return;
+    }
+    if (newOrmawa.password.length < 6) {
+      setError("Password minimal 6 karakter");
       return;
     }
     
@@ -74,9 +178,9 @@ export function BEMDashboard() {
           full_name: newOrmawa.fullName,
           email: newOrmawa.email,
           is_active: true
-        })
+        } as any)
         .select()
-        .single();
+        .single() as { data: any; error: any };
 
       if (ormawaError) throw new Error(ormawaError.message);
 
@@ -97,8 +201,16 @@ export function BEMDashboard() {
       });
 
       if (signUpError) {
-        // Rollback: hapus ormawa jika pembuatan akun auth gagal
-        await supabase.from("ormawa").delete().eq("id", ormawaData.id);
+        // Rollback: hapus ormawa jika pembuatan akun auth gagal (retry 1x)
+        const { error: delError } = await supabase.from("ormawa").delete().eq("id", ormawaData.id);
+        if (delError) {
+          console.error("Rollback gagal (attempt 1):", delError.message);
+          // Retry sekali
+          const { error: delError2 } = await supabase.from("ormawa").delete().eq("id", ormawaData.id);
+          if (delError2) {
+            console.error("Rollback gagal (attempt 2):", delError2.message, "Orphan ormawa ID:", ormawaData.id);
+          }
+        }
         throw new Error(signUpError.message);
       }
 
@@ -142,46 +254,49 @@ export function BEMDashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: "Total Ormawa", value: ormawaList.length, icon: Building2, color: "#ff6900" },
-          { label: "Total Event", value: EVENTS.length, icon: Calendar, color: "#3b82f6" },
-          { label: "Total Peserta", value: "472", icon: Users, color: "#22c55e" },
-          { label: "Pertumbuhan", value: "+23%", icon: TrendingUp, color: "#a855f7" },
+          { label: "Total Kegiatan", value: stats.totalKegiatan, subLabel: `${stats.kegiatanBulanIni} bulan ini`, icon: Calendar, color: "#3b82f6" },
+          { label: "Total Pendaftar", value: stats.totalPendaftar, subLabel: `${stats.pendaftarBulanIni} bulan ini`, icon: Users, color: "#ff6900" },
+          { label: "Total Hadir", value: stats.totalHadir, subLabel: `${stats.hadirBulanIni} bulan ini`, icon: Award, color: "#22c55e" },
+          { label: "Persentase Hadir", value: `${stats.persentaseHadir}%`, subLabel: `${stats.persentaseHadirBulanIni}% bulan ini`, icon: TrendingUp, color: "#a855f7" },
         ].map((s) => (
           <GlassCard key={s.label} className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}15` }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${s.color}15` }}>
                 <s.icon className="w-5 h-5" style={{ color: s.color }} />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold text-foreground truncate">{s.value}</p>
+                <p className="text-xs font-medium text-muted-foreground truncate">{s.label}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{s.subLabel}</p>
               </div>
             </div>
           </GlassCard>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="space-y-6 mb-8">
         <GlassCard className="p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-[#ff6900]" /> Partisipasi Kegiatan Per Bulan</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={MONTHLY_STATS}>
+          <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-[#ff6900]" /> Pendaftar Per Bulan</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={monthlyChart}>
               <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ background: tooltipBg, border: tooltipBorder, borderRadius: "12px", color: tooltipColor, fontSize: 12 }} />
-              <Bar dataKey="participants" fill="#ff6900" radius={[6, 6, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="mahasiswa" name="Mahasiswa" fill="#ff6900" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="umum" name="Umum" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </GlassCard>
 
         <GlassCard className="p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-[#3b82f6]" /> Tren Jumlah Event</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={MONTHLY_STATS}>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={monthlyChart}>
               <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ background: tooltipBg, border: tooltipBorder, borderRadius: "12px", color: tooltipColor, fontSize: 12 }} />
-              <Line type="monotone" dataKey="events" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} />
+              <Line type="monotone" dataKey="events" name="Total Event" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         </GlassCard>
@@ -261,9 +376,9 @@ export function BEMDashboard() {
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Password</label>
                 <div className="relative">
-                  <input type={showPassword ? "text" : "password"} placeholder="Masukkan password akun" value={newOrmawa.password} onChange={e => setNewOrmawa({...newOrmawa, password: e.target.value})} className="w-full px-4 py-2.5 pr-10 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
+                  <input type={showPassword ? "text" : "password"} placeholder="Buat password akun" value={newOrmawa.password} onChange={e => setNewOrmawa({...newOrmawa, password: e.target.value})} className="w-full px-4 py-2.5 pr-10 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

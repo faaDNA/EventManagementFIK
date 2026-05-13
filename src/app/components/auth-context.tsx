@@ -174,6 +174,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     meta: { full_name: string; nim?: string; role?: string }
   ): Promise<{ error: string | null }> {
+    // ── Validasi password ──
+    if (password.length < 6) {
+      return { error: "Password minimal 6 karakter." };
+    }
+    if (!meta.full_name.trim()) {
+      return { error: "Nama lengkap wajib diisi." };
+    }
+
     const isMahasiswa = email.endsWith("@mahasiswa.upnvj.ac.id");
     const assignedRole = meta.role || (isMahasiswa ? "mahasiswa" : "umum");
 
@@ -201,7 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: assignedRole,
         nim: meta.nim ?? null,
         ormawa_id: null,
-      });
+      } as any);
     }
 
     return { error: null };

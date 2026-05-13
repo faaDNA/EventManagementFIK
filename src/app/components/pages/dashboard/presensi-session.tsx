@@ -530,7 +530,7 @@ export function PresensiSession() {
     URL.revokeObjectURL(urlBlob);
   };
 
-  const inputClass = "w-full px-3 py-2 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition";
+  const inputClass = "w-full px-3 py-2 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition [color-scheme:light] dark:[color-scheme:dark]";
 
   if (loading) {
     return (

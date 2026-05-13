@@ -6,7 +6,7 @@ import { useAuth } from "../../auth-context";
 import type { Event } from "../../../../lib/database.types";
 import {
   ArrowLeft, Calendar, MapPin, Users, CalendarX, Edit3, Save, X, Upload,
-  Download, PlusCircle, QrCode, FileText, Trash2, CheckCircle2, Eye, Clock, Loader2
+  Download, PlusCircle, QrCode, FileText, Trash2, CheckCircle2, Eye, Clock, Loader2, ChevronDown, ChevronUp
 } from "lucide-react";
 
 function formatDateRange(date: string, endDate?: string | null) {
@@ -14,6 +14,42 @@ function formatDateRange(date: string, endDate?: string | null) {
   const start = new Date(date).toLocaleDateString("id-ID", opts);
   if (!endDate || endDate === date) return start;
   return `${start} – ${new Date(endDate).toLocaleDateString("id-ID", opts)}`;
+}
+
+function formatTimeStringToAMPM(timeStr?: string) {
+  if (!timeStr) return "";
+  const parts = timeStr.split("-").map(p => p.trim());
+  const format = (t: string) => {
+    if (!t) return "";
+    const split = t.split(":");
+    if (split.length < 2) return t;
+    let hour = parseInt(split[0], 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12;
+    return `${hour.toString().padStart(2, '0')}:${split[1].slice(0, 2)} ${ampm}`;
+  };
+  if (parts.length === 1) return format(parts[0]);
+  return `${format(parts[0])} - ${format(parts[1])}`;
+}
+
+const DESC_MAX = 300;
+function ExpandableText({ text }: { text: string | null }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const desc = text || "Belum ada deskripsi.";
+  const isLong = desc.length > DESC_MAX;
+  return (
+    <>
+      <div className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+        {isLong && !expanded ? desc.slice(0, DESC_MAX) + "..." : desc}
+      </div>
+      {isLong && (
+        <button onClick={() => setExpanded(!expanded)} className="mt-2 text-xs font-semibold text-[#ff6900] hover:underline flex items-center gap-1">
+          {expanded ? <><ChevronUp className="w-3.5 h-3.5" /> Sembunyikan</> : <><ChevronDown className="w-3.5 h-3.5" /> Selengkapnya</>}
+        </button>
+      )}
+    </>
+  );
 }
 
 interface SessionData {
@@ -35,6 +71,7 @@ export function DashboardKegiatanKamiDetail() {
   const [pageLoading, setPageLoading] = useState(true);
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [registrantCount, setRegistrantCount] = useState(0);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchEvent() {
@@ -48,7 +85,10 @@ export function DashboardKegiatanKamiDetail() {
         const res = await fetch(`${url}/rest/v1/events?id=eq.${id}&select=*`, { headers, signal: AbortSignal.timeout(15000) });
         if (res.ok) {
           const data = await res.json();
-          if (data.length > 0) setEvent(data[0]);
+          if (data.length > 0) {
+            setEvent(data[0]);
+            setLastUpdatedAt(data[0].updated_at || null);
+          }
         }
 
         // Fetch sessions
@@ -93,6 +133,7 @@ export function DashboardKegiatanKamiDetail() {
   const [editCover, setEditCover] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [editCategory, setEditCategory] = useState("");
+  const [editTargetAudience, setEditTargetAudience] = useState("");
   const [saved, setSaved] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -110,6 +151,7 @@ export function DashboardKegiatanKamiDetail() {
     setEditCloseDate(event.registration_close_date || "");
     setEditCover(event.cover_url || "");
     setEditCategory(event.category || "");
+    setEditTargetAudience((event as any).target_audience || "semua");
   }, [event]);
 
   // Presensi
@@ -167,18 +209,19 @@ export function DashboardKegiatanKamiDetail() {
       const payload: Record<string, any> = {
         title: editTitle,
         description: editDescription,
-        date: editDate,
-        end_date: editEndDate || null,
-        time_start: timeStart,
-        time_end: timeEnd,
-        location: editLocation,
+        date: editCategory === "Oprec" && editCloseDate ? editCloseDate : editDate,
+        end_date: editCategory === "Oprec" ? null : (editEndDate || null),
+        time_start: editCategory === "Oprec" ? null : timeStart,
+        time_end: editCategory === "Oprec" ? null : timeEnd,
+        location: editCategory === "Oprec" ? null : editLocation,
         quota: editQuota ? parseInt(editQuota) : null,
         registration_close_date: editCloseDate || null,
         category: editCategory,
+        target_audience: editTargetAudience,
         cover_url: finalCoverUrl
       };
 
-      const res = await fetch(`${url}/rest/v1/events?id=eq.${id}`, {
+      const res = await fetch(`${url}/rest/v1/events?id=eq.${id}${lastUpdatedAt ? `&updated_at=eq.${encodeURIComponent(lastUpdatedAt)}` : ''}`, {
         method: "PATCH",
         headers: {
           "apikey": key,
@@ -191,7 +234,13 @@ export function DashboardKegiatanKamiDetail() {
 
       if (res.ok) {
         const data = await res.json();
+        if (data.length === 0) {
+          alert("Data sudah diubah oleh pengguna lain. Halaman akan di-refresh.");
+          window.location.reload();
+          return;
+        }
         setEvent(data[0]);
+        setLastUpdatedAt(data[0].updated_at);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         setIsEditing(false);
@@ -438,7 +487,7 @@ export function DashboardKegiatanKamiDetail() {
     }
   };
 
-  const inputClass = "w-full px-3 py-2 rounded-xl bg-input-background border border-[#ff6900]/30 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition";
+  const inputClass = "w-full px-3 py-2 rounded-xl bg-input-background border border-[#ff6900]/30 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition [color-scheme:light] dark:[color-scheme:dark]";
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -446,130 +495,187 @@ export function DashboardKegiatanKamiDetail() {
         <ArrowLeft className="w-4 h-4" /> Kembali ke Kegiatan Kami
       </button>
 
-      {/* Cover */}
-      <div className="relative rounded-2xl overflow-hidden h-48 md:h-64 mb-6">
-        <ImageWithFallback src={editCover} alt={editTitle} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-        {isEditing && (
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white text-xs font-medium flex items-center gap-1.5 transition backdrop-blur-sm"
-          >
-            <Upload className="w-3.5 h-3.5" /> Ganti Cover
-          </button>
-        )}
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex gap-2 mb-2">
-            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${event.status === "upcoming" ? "bg-[#ff6900]/80 text-white" : "bg-emerald-500/80 text-white"}`}>
-              {event.status === "upcoming" ? "Akan Datang" : "Berlangsung"}
-            </span>
-            {isEditing ? (
-              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="px-2.5 py-0.5 rounded-full text-[11px] bg-black/40 text-white backdrop-blur-md border border-white/20 focus:outline-none w-28">
-                <option value="Seminar" className="bg-black text-white">Seminar</option>
-                <option value="Workshop" className="bg-black text-white">Workshop</option>
-                <option value="Kompetisi" className="bg-black text-white">Kompetisi</option>
-                <option value="Oprec" className="bg-black text-white">Oprec</option>
-                <option value="Pelatihan" className="bg-black text-white">Pelatihan</option>
-                <option value="Lainnya" className="bg-black text-white">Lainnya</option>
-              </select>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/15 text-white/90 backdrop-blur-md">{editCategory}</span>
-            )}
-          </div>
-          {isEditing ? (
-            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="text-xl md:text-2xl font-bold text-white bg-transparent border-b border-white/30 focus:outline-none focus:border-white/60 w-full" />
-          ) : (
-            <h1 className="text-xl md:text-2xl font-bold text-white">{editTitle}</h1>
-          )}
-        </div>
-      </div>
-
-      {/* Edit toolbar */}
-      <div className="flex items-center justify-end gap-2 mb-6">
-        {saved && (
-          <span className="flex items-center gap-1 text-xs text-emerald-500 mr-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Perubahan tersimpan
-          </span>
-        )}
-        {isEditing ? (
-          <>
-            <button onClick={handleCancel} className="px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition flex items-center gap-1.5">
-              <X className="w-4 h-4" /> Batal
-            </button>
-            <button onClick={handleSave} className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white text-sm font-semibold hover:opacity-90 transition flex items-center gap-1.5 shadow-md shadow-[#ff6900]/20">
-              <Save className="w-4 h-4" /> Simpan Perubahan
-            </button>
-          </>
-        ) : event.status !== "completed" ? (
-          <>
-            <button onClick={() => setShowCompleteModal(true)} className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-sm font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" /> Tandai Selesai
-            </button>
-            <button onClick={() => setIsEditing(true)} className="px-4 py-2 rounded-xl bg-muted border border-border text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-1.5">
-              <Edit3 className="w-4 h-4" /> Edit Kegiatan
-            </button>
-          </>
-        ) : null}
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* Cover */}
+          <div className="relative rounded-2xl overflow-hidden aspect-video w-full md:aspect-auto md:h-72">
+            <ImageWithFallback src={editCover} alt={editTitle} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            {isEditing && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white text-xs font-medium flex items-center gap-1.5 transition backdrop-blur-sm"
+              >
+                <Upload className="w-3.5 h-3.5" /> Ganti Cover
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+            <div className="absolute bottom-4 left-4 right-4">
+              <div className="flex gap-2 mb-2">
+                {(() => {
+                  let isOngoingDate = false;
+                  if (event.date) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const start = new Date(event.date);
+                    start.setHours(0, 0, 0, 0);
+                    const end = event.end_date ? new Date(event.end_date) : new Date(start);
+                    end.setHours(0, 0, 0, 0);
+                    if (today >= start && today <= end) {
+                      isOngoingDate = true;
+                    }
+                  }
+                  const isActuallyOngoing = isOngoingDate && event.status !== "completed" && event.status !== "draft" && event.status !== "cancelled";
+
+                  let text = event.status;
+                  let bg = "bg-[#ff6900]/80 text-white";
+
+                  if (isActuallyOngoing) {
+                    text = "Berlangsung";
+                    bg = "bg-emerald-500/80 text-white";
+                  } else if (event.status === "published") {
+                    text = "Dibuka";
+                    bg = "bg-[#ff6900]/80 text-white";
+                  } else if (event.status === "ongoing") {
+                    text = "Berlangsung";
+                    bg = "bg-emerald-500/80 text-white";
+                  } else if (event.status === "completed") {
+                    text = "Selesai";
+                    bg = "bg-zinc-500/80 text-white";
+                  }
+
+                  return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${bg}`}>
+                      {text}
+                    </span>
+                  );
+                })()}
+                {isEditing ? (
+                  <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="px-2.5 py-0.5 rounded-full text-[11px] bg-black/40 text-white backdrop-blur-md border border-white/20 focus:outline-none w-28">
+                    <option value="Seminar" className="bg-black text-white">Seminar</option>
+                    <option value="Workshop" className="bg-black text-white">Workshop</option>
+                    <option value="Kompetisi" className="bg-black text-white">Kompetisi</option>
+                    <option value="Oprec" className="bg-black text-white">Oprec</option>
+                    <option value="Pelatihan" className="bg-black text-white">Pelatihan</option>
+                    <option value="Lainnya" className="bg-black text-white">Lainnya</option>
+                  </select>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/95 text-zinc-900 shadow-sm">{editCategory}</span>
+                )}
+                {isEditing ? (
+                  <select value={editTargetAudience} onChange={(e) => setEditTargetAudience(e.target.value)} className="px-2.5 py-0.5 rounded-full text-[11px] bg-black/40 text-white backdrop-blur-md border border-white/20 focus:outline-none w-28">
+                    <option value="semua" className="bg-black text-white">Umum & Mhs</option>
+                    <option value="mahasiswa" className="bg-black text-white">Mahasiswa</option>
+                  </select>
+                ) : (
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold backdrop-blur-md border ${
+                    editTargetAudience === "mahasiswa" 
+                      ? "bg-blue-500/80 text-white border-blue-400/30" 
+                      : "bg-purple-500/80 text-white border-purple-400/30"
+                  }`}>
+                    {editTargetAudience === "mahasiswa" ? "Mahasiswa" : "Umum & Mahasiswa"}
+                  </span>
+                )}
+              </div>
+              {isEditing ? (
+                <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="text-xl md:text-2xl font-bold text-white bg-transparent border-b border-white/30 focus:outline-none focus:border-white/60 w-full" />
+              ) : (
+                <h1 className="text-xl md:text-2xl font-bold text-white">{editTitle}</h1>
+              )}
+            </div>
+          </div>
+
+          {/* Edit toolbar */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {isEditing ? (
+                <>
+                  <button onClick={handleCancel} className="px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition flex items-center gap-1.5">
+                    <X className="w-4 h-4" /> Batal
+                  </button>
+                  <button onClick={handleSave} className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white text-sm font-semibold hover:opacity-90 transition flex items-center gap-1.5 shadow-md shadow-[#ff6900]/20">
+                    <Save className="w-4 h-4" /> Simpan Perubahan
+                  </button>
+                </>
+              ) : event.status !== "completed" ? (
+                <>
+                  <button onClick={() => setShowCompleteModal(true)} className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-sm font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" /> Tandai Selesai
+                  </button>
+                  <button onClick={() => navigate(`/dashboard/tambah-kegiatan?edit=${id}`)} className="px-4 py-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 text-sm font-semibold hover:bg-blue-100 dark:hover:bg-blue-500/20 transition flex items-center gap-1.5">
+                    <Edit3 className="w-4 h-4" /> Edit Form & Pesan
+                  </button>
+                  <button onClick={() => setIsEditing(true)} className="px-4 py-2 rounded-xl bg-muted border border-border text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-1.5">
+                    <Edit3 className="w-4 h-4" /> Edit Kegiatan
+                  </button>
+                </>
+              ) : null}
+            </div>
+            {saved && (
+              <span className="flex items-center gap-1 text-xs text-emerald-500">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Perubahan tersimpan
+              </span>
+            )}
+          </div>
           {/* Detail Kegiatan */}
           <GlassCard className="p-5">
             <h2 className="text-base font-bold text-foreground mb-4">Detail Kegiatan</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <Calendar className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-[11px] text-muted-foreground mb-0.5">Tanggal Mulai</p>
-                  {isEditing ? (
-                    <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={inputClass} />
-                  ) : (
-                    <p className="text-sm font-medium text-foreground">{formatDateRange(editDate, editEndDate)}</p>
-                  )}
-                </div>
-              </div>
-              {isEditing && (
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-[11px] text-muted-foreground mb-0.5">Tanggal Selesai</p>
-                    <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} min={editDate} className={inputClass} />
-                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">Kosongkan jika sama</p>
+              {editCategory !== "Oprec" && (
+                <>
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-[11px] text-muted-foreground mb-0.5">Tanggal Mulai</p>
+                      {isEditing ? (
+                        <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={inputClass} />
+                      ) : (
+                        <p className="text-sm font-medium text-foreground">{formatDateRange(editDate, editEndDate)}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                  {isEditing && (
+                    <div className="flex items-start gap-3">
+                      <Calendar className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-[11px] text-muted-foreground mb-0.5">Tanggal Selesai</p>
+                        <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} min={editDate} className={inputClass} />
+                        <p className="text-[10px] text-muted-foreground/60 mt-0.5">Kosongkan jika sama</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-[11px] text-muted-foreground mb-0.5">Waktu</p>
+                      {isEditing ? (
+                        <input type="text" value={editTime} onChange={(e) => setEditTime(e.target.value)} placeholder="09:00 - 12:00" className={inputClass} />
+                      ) : (
+                        <p className="text-sm font-medium text-foreground">{formatTimeStringToAMPM(editTime)}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-[11px] text-muted-foreground mb-0.5">Lokasi</p>
+                      {isEditing ? (
+                        <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className={inputClass} />
+                      ) : (
+                        <p className="text-sm font-medium text-foreground">{editLocation || "—"}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
-              <div className="flex items-start gap-3">
-                <Clock className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-[11px] text-muted-foreground mb-0.5">Waktu</p>
-                  {isEditing ? (
-                    <input type="text" value={editTime} onChange={(e) => setEditTime(e.target.value)} placeholder="09:00 - 12:00" className={inputClass} />
-                  ) : (
-                    <p className="text-sm font-medium text-foreground">{editTime}</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-[11px] text-muted-foreground mb-0.5">Lokasi</p>
-                  {isEditing ? (
-                    <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className={inputClass} />
-                  ) : (
-                    <p className="text-sm font-medium text-foreground">{editLocation}</p>
-                  )}
-                </div>
-              </div>
               <div className="flex items-start gap-3">
                 <Users className="w-4 h-4 text-[#ff6900] mt-0.5 shrink-0" />
                 <div className="flex-1">
                   <p className="text-[11px] text-muted-foreground mb-0.5">Kuota Peserta</p>
                   {isEditing ? (
-                    <input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className={inputClass} />
+                    <input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} placeholder="Kosongkan jika tak terbatas" className={inputClass} />
                   ) : (
-                    <p className="text-sm font-medium text-foreground">{registrantCount} / {editQuota || event.quota}</p>
+                    <p className="text-sm font-medium text-foreground">{event.quota ? `${registrantCount} / ${event.quota}` : "Tidak Terbatas"}</p>
                   )}
                 </div>
               </div>
@@ -595,87 +701,11 @@ export function DashboardKegiatanKamiDetail() {
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={4}
                   className="w-full px-3 py-2 rounded-xl bg-input-background border border-[#ff6900]/30 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition resize-none" />
               ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">{editDescription}</p>
+                <ExpandableText text={editDescription} />
               )}
             </div>
           </GlassCard>
 
-          {/* Data Pendaftar - simplified */}
-          <GlassCard className="p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#ff6900]/10 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-[#ff6900]" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-foreground">Data Pendaftar</h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    <span className="text-lg font-bold text-foreground">{registrantCount}</span> orang terdaftar
-                  </p>
-                </div>
-              </div>
-              <button onClick={handleExport}
-                className="px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition flex items-center gap-2">
-                <Download className="w-4 h-4" /> Export CSV
-              </button>
-            </div>
-          </GlassCard>
-
-          {/* Sesi Presensi */}
-          <GlassCard className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-base font-bold text-foreground">Sesi Presensi</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{sessions.length} sesi</p>
-              </div>
-              {event.status !== "completed" && (
-                <button onClick={() => setShowPresensiModal(true)}
-                  className="px-3 py-2 rounded-xl bg-[#ff6900]/10 border border-[#ff6900]/20 text-xs text-[#ff6900] font-medium hover:bg-[#ff6900]/20 transition flex items-center gap-1.5">
-                  <PlusCircle className="w-3.5 h-3.5" /> Tambah Sesi
-                </button>
-              )}
-            </div>
-
-            {sessions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                <p>Belum ada sesi presensi. Klik "Tambah Sesi" untuk menambahkan.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sessions.map((session, index) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-muted/50 border border-border group cursor-pointer hover:border-[#ff6900]/20 transition"
-                    onClick={() => navigate(`/dashboard/kegiatan-kami/${id}/presensi/${session.id}`, { state: { session } })}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-lg bg-[#ff6900]/10 flex items-center justify-center text-[#ff6900] text-xs font-bold">{index + 1}</span>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{session.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {session.method === "qr" ? <QrCode className="w-3 h-3 text-muted-foreground" /> : <FileText className="w-3 h-3 text-muted-foreground" />}
-                          <span className="text-[11px] text-muted-foreground">{session.method === "qr" ? "QR Code" : "Custom Form"}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${session.isOpen ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-red-100 dark:bg-red-500/15 text-red-500"}`}>
-                            {session.isOpen ? "Dibuka" : "Ditutup"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/kegiatan-kami/${id}/presensi/${session.id}`, { state: { session } }); }}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-[#ff6900] hover:bg-[#ff6900]/10 transition">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleRemoveSession(session.id); }}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
         </div>
 
         {/* Sidebar */}
@@ -685,9 +715,44 @@ export function DashboardKegiatanKamiDetail() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">Status</span>
-                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${event.status === "upcoming" ? "bg-[#ff6900]/10 text-[#ff6900]" : "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"}`}>
-                  {event.status === "upcoming" ? "Akan Datang" : "Berlangsung"}
-                </span>
+                {(() => {
+                  let isOngoingDate = false;
+                  if (event.date) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const start = new Date(event.date);
+                    start.setHours(0, 0, 0, 0);
+                    const end = event.end_date ? new Date(event.end_date) : new Date(start);
+                    end.setHours(0, 0, 0, 0);
+                    if (today >= start && today <= end) {
+                      isOngoingDate = true;
+                    }
+                  }
+                  const isActuallyOngoing = isOngoingDate && event.status !== "completed" && event.status !== "draft" && event.status !== "cancelled";
+
+                  let text = event.status;
+                  let bg = "bg-[#ff6900]/10 text-[#ff6900]";
+
+                  if (isActuallyOngoing) {
+                    text = "Berlangsung";
+                    bg = "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                  } else if (event.status === "published") {
+                    text = "Dibuka";
+                    bg = "bg-[#ff6900]/10 text-[#ff6900]";
+                  } else if (event.status === "ongoing") {
+                    text = "Berlangsung";
+                    bg = "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                  } else if (event.status === "completed") {
+                    text = "Selesai";
+                    bg = "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400";
+                  }
+
+                  return (
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${bg}`}>
+                      {text}
+                    </span>
+                  );
+                })()}
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">Pendaftar</span>
@@ -695,17 +760,98 @@ export function DashboardKegiatanKamiDetail() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">Kuota</span>
-                <span className="text-sm font-semibold text-foreground">{editQuota || event.quota}</span>
+                <span className="text-sm font-semibold text-foreground">{event.quota || "Tak Terbatas"}</span>
               </div>
+              {event.quota ? (
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a]"
+                    style={{ width: `${Math.min((registrantCount / event.quota) * 100, 100)}%` }} />
+                </div>
+              ) : null}
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">Sesi Presensi</span>
                 <span className="text-sm font-semibold text-foreground">{sessions.length}</span>
               </div>
-              <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a]"
-                  style={{ width: `${Math.min((registrantCount / (parseInt(editQuota) || event.quota)) * 100, 100)}%` }} />
-              </div>
             </div>
+          </GlassCard>
+
+          {/* Data Pendaftar - simplified */}
+          <GlassCard className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-[#ff6900]/10 flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5 text-[#ff6900]" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">Pendaftar</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <span className="font-semibold text-foreground">{registrantCount}</span> orang terdaftar
+                  </p>
+                </div>
+              </div>
+              <button onClick={handleExport}
+                className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition flex items-center gap-1.5 shrink-0">
+                <Download className="w-3.5 h-3.5" /> CSV
+              </button>
+            </div>
+          </GlassCard>
+
+          {/* Sesi Presensi */}
+          <GlassCard className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Sesi Presensi</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{sessions.length} sesi</p>
+              </div>
+              {event.status !== "completed" && (
+                <button onClick={() => setShowPresensiModal(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ff6900]/10 border border-[#ff6900]/20 text-[11px] text-[#ff6900] font-medium hover:bg-[#ff6900]/20 transition flex items-center gap-1">
+                  <PlusCircle className="w-3.5 h-3.5" /> Tambah
+                </button>
+              )}
+            </div>
+
+            {sessions.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-xs">
+                <p>Belum ada sesi presensi.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {sessions.map((session, index) => (
+                  <div
+                    key={session.id}
+                    className="flex flex-col gap-2 p-3 rounded-xl bg-muted/50 border border-border group cursor-pointer hover:border-[#ff6900]/20 transition"
+                    onClick={() => navigate(`/dashboard/kegiatan-kami/${id}/presensi/${session.id}`, { state: { session } })}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <span className="w-6 h-6 rounded-md bg-[#ff6900]/10 flex items-center justify-center text-[#ff6900] text-[10px] font-bold shrink-0">{index + 1}</span>
+                        <p className="text-sm font-medium text-foreground truncate">{session.name}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/kegiatan-kami/${id}/presensi/${session.id}`, { state: { session } }); }}
+                          className="p-1 rounded-md text-muted-foreground hover:text-[#ff6900] hover:bg-[#ff6900]/10 transition">
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleRemoveSession(session.id); }}
+                          className="p-1 rounded-md text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition border border-red-200 dark:border-red-500/20">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between ml-8.5 pl-1 border-t border-border/50 pt-2">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        {session.method === "qr" ? <QrCode className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                        <span className="text-[10px]">{session.method === "qr" ? "QR Code" : "Custom Form"}</span>
+                      </div>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider ${session.isOpen ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-red-100 dark:bg-red-500/15 text-red-500"}`}>
+                        {session.isOpen ? "Dibuka" : "Ditutup"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </GlassCard>
         </div>
       </div>

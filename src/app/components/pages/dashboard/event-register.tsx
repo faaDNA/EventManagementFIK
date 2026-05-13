@@ -181,49 +181,31 @@ export function DashboardEventRegister() {
     if (!session?.user?.id || !id) return;
     setSubmitting(true);
     try {
-      // 0. Check deadline and quota first
-      if (event?.registration_close_date && new Date() > new Date(event.registration_close_date)) {
-        throw new Error("Maaf, masa pendaftaran untuk kegiatan ini sudah ditutup.");
-      }
-      
-      if (event?.quota !== null) {
-        const countRes = await fetch(`${supabaseUrl}/rest/v1/rpc/get_event_registrations_count`, {
-          method: "POST",
-          headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify({ p_event_id: id }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (countRes.ok) {
-          const count = await countRes.json();
-          if (count >= event!.quota) {
-            throw new Error("Maaf, kuota untuk kegiatan ini sudah penuh.");
-          }
-        }
-      }
-
-      // 1. Submit Registration
-      const regRes = await fetch(`${supabaseUrl}/rest/v1/event_registrations`, {
+      // 1. Atomic registration via RPC (cek kuota + deadline + insert dalam 1 transaction)
+      const regRes = await fetch(`${supabaseUrl}/rest/v1/rpc/register_for_event`, {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json", "Prefer": "return=representation" },
-        body: JSON.stringify({
-          event_id: id,
-          user_id: session.user.id
-          // intentionally omit status to rely on DB default, which avoids constraint issues if schema differs
-        }),
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_event_id: id, p_user_id: session.user.id }),
         signal: AbortSignal.timeout(15000),
       });
 
       if (!regRes.ok) {
         const errBody = await regRes.json();
-        if (errBody.code === "23505") {
-          // Unique constraint violation -> user already registered
+        const msg = errBody.message || "";
+        // Handle specific error codes from the SQL function
+        if (errBody.code === "23505" || msg.includes("sudah")) {
           throw new Error("Kamu sudah mendaftar untuk kegiatan ini sebelumnya.");
+        } else if (errBody.code === "P0004" || msg.includes("penuh") || msg.includes("Kuota")) {
+          throw new Error("Maaf, kuota untuk kegiatan ini sudah penuh.");
+        } else if (errBody.code === "P0003" || msg.includes("ditutup")) {
+          throw new Error("Maaf, masa pendaftaran sudah ditutup.");
+        } else if (errBody.code === "P0002") {
+          throw new Error("Event tidak menerima pendaftaran saat ini.");
         }
-        throw new Error(errBody.message || "Gagal mendaftar ke kegiatan.");
+        throw new Error(msg || "Gagal mendaftar ke kegiatan.");
       }
-      
-      const regData = await regRes.json();
-      const registrationId = regData[0].id;
+
+      const registrationId = await regRes.json();
 
       // 2. Upload files to Supabase Storage & replace filenames with public URLs
       const finalAnswers = { ...formValues };

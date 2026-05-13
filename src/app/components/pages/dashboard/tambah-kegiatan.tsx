@@ -15,7 +15,8 @@ export function DashboardTambahKegiatan() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { session, profile } = useAuth();
-  const [draftId, setDraftId] = useState<string | null>(searchParams.get("draft"));
+  const [draftId, setDraftId] = useState<string | null>(searchParams.get("draft") || searchParams.get("edit"));
+  const [isEditMode] = useState(!!searchParams.get("edit"));
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,6 +33,7 @@ export function DashboardTambahKegiatan() {
   const [eventTimeEnd, setEventTimeEnd] = useState("");
   const [location, setLocation] = useState("");
   const [quota, setQuota] = useState("");
+  const [targetAudience, setTargetAudience] = useState<"semua" | "mahasiswa">("semua");
 
   // Step 2 - form builder
   const [formFields, setFormFields] = useState<FormField[]>([
@@ -48,7 +50,7 @@ export function DashboardTambahKegiatan() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [loadingDraft, setLoadingDraft] = useState(!!searchParams.get("draft"));
+  const [loadingDraft, setLoadingDraft] = useState(!!searchParams.get("draft") || !!searchParams.get("edit"));
 
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,6 +88,7 @@ export function DashboardTambahKegiatan() {
         setLocation(e.location || "");
         setQuota(e.quota ? String(e.quota) : "");
         setRegistrationMessage(e.registration_message || "");
+        setTargetAudience(e.target_audience || "semua");
         if (e.cover_url) setCoverPreview(e.cover_url);
 
         // Load form fields if form exists
@@ -161,6 +164,7 @@ export function DashboardTambahKegiatan() {
         quota: quota ? parseInt(quota) : null,
         registration_close_date: closeDate || null,
         registration_message: registrationMessage.trim() || null,
+        target_audience: targetAudience,
         status: "draft",
         has_presensi: false,
       };
@@ -272,7 +276,9 @@ export function DashboardTambahKegiatan() {
     if (!title.trim()) { setError("Judul kegiatan wajib diisi"); return; }
     if (!description.trim()) { setError("Deskripsi wajib diisi"); return; }
     if (!closeDate) { setError("Tanggal penutupan pendaftaran wajib diisi"); return; }
+    if (category !== "Oprec" && !eventDate) { setError("Tanggal mulai kegiatan wajib diisi"); return; }
     if (!coverPreview) { setError("Cover kegiatan wajib diupload"); return; }
+    if (!location.trim()) { setError("Lokasi kegiatan wajib diisi"); return; }
     setStep(2);
   };
 
@@ -333,7 +339,7 @@ export function DashboardTambahKegiatan() {
 
     try {
       let eventId: string;
-      const eventData = {
+      const eventData: Record<string, any> = {
         title: title.trim(),
         description: description.trim(),
         category,
@@ -345,9 +351,12 @@ export function DashboardTambahKegiatan() {
         quota: quota ? parseInt(quota) : null,
         registration_close_date: closeDate,
         registration_message: registrationMessage.trim() || null,
-        status: "published",
+        target_audience: targetAudience,
         has_presensi: false,
       };
+      if (!isEditMode) {
+        eventData.status = "published";
+      }
 
       if (draftId) {
         // Update existing draft → published
@@ -478,11 +487,11 @@ export function DashboardTambahKegiatan() {
         // Remap goToSection inside options from local IDs to DB UUIDs
         const remappedOptions = f.options
           ? f.options.map(opt => ({
-              ...opt,
-              goToSection: opt.goToSection
-                ? (opt.goToSection === "__end__" ? "__end__" : sectionIdMap[opt.goToSection] || opt.goToSection)
-                : opt.goToSection,
-            }))
+            ...opt,
+            goToSection: opt.goToSection
+              ? (opt.goToSection === "__end__" ? "__end__" : sectionIdMap[opt.goToSection] || opt.goToSection)
+              : opt.goToSection,
+          }))
           : null;
 
         await dbInsert("form_fields", {
@@ -519,7 +528,7 @@ export function DashboardTambahKegiatan() {
     else setStep(2);
   };
 
-  const inputClass = "w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition placeholder:text-muted-foreground/40";
+  const inputClass = "w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition placeholder:text-muted-foreground/40 [color-scheme:light] dark:[color-scheme:dark]";
 
   if (loadingDraft) {
     return (
@@ -538,7 +547,7 @@ export function DashboardTambahKegiatan() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{draftId ? "Edit Draft Kegiatan" : "Buat Kegiatan Baru"}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{isEditMode ? "Edit Kegiatan" : draftId ? "Edit Draft Kegiatan" : "Buat Kegiatan Baru"}</h1>
           <p className="text-muted-foreground text-sm">Langkah {step} dari 3 — {step === 1 ? "Detail Kegiatan" : step === 2 ? "Form Pendaftaran" : "Pesan untuk Pendaftar"}</p>
         </div>
       </div>
@@ -552,16 +561,14 @@ export function DashboardTambahKegiatan() {
         ].map((s, i) => (
           <React.Fragment key={s.num}>
             {i > 0 && <div className="w-8 h-0.5 bg-border rounded" />}
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${
-              step === s.num ? "bg-[#ff6900]/10 text-[#ff6900]" :
-              step > s.num ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
-              "bg-muted text-muted-foreground"
-            }`}>
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === s.num ? "bg-[#ff6900] text-white" :
-                step > s.num ? "bg-emerald-500 text-white" :
-                "bg-muted-foreground/30 text-muted-foreground"
-              }`}>{step > s.num ? "✓" : s.num}</span>
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${step === s.num ? "bg-[#ff6900]/10 text-[#ff6900]" :
+                step > s.num ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                  "bg-muted text-muted-foreground"
+              }`}>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === s.num ? "bg-[#ff6900] text-white" :
+                  step > s.num ? "bg-emerald-500 text-white" :
+                    "bg-muted-foreground/30 text-muted-foreground"
+                }`}>{step > s.num ? "✓" : s.num}</span>
               <span className="hidden sm:inline">{s.label}</span>
             </div>
           </React.Fragment>
@@ -588,7 +595,7 @@ export function DashboardTambahKegiatan() {
                 >
                   <Upload className="w-8 h-8 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Klik untuk upload cover</span>
-                  <span className="text-[10px] text-muted-foreground/60">JPG, PNG (maks 5MB)</span>
+                  <span className="text-[10px] text-muted-foreground/60">JPG, PNG (maks 5MB) • Rekomendasi rasio 16:9 (misal: 1280x720)</span>
                 </button>
               )}
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
@@ -605,9 +612,17 @@ export function DashboardTambahKegiatan() {
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Kategori</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Kategori *</label>
               <select value={category} onChange={e => setCategory(e.target.value as EventCategory)} className={inputClass}>
                 {CATEGORIES.map(c => <option key={c} value={c} className="bg-background text-foreground dark:bg-zinc-900">{c}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Target Peserta *</label>
+              <select value={targetAudience} onChange={e => setTargetAudience(e.target.value as "semua" | "mahasiswa")} className={inputClass}>
+                <option value="semua" className="bg-background text-foreground dark:bg-zinc-900">Umum & Mahasiswa</option>
+                <option value="mahasiswa" className="bg-background text-foreground dark:bg-zinc-900">Hanya Mahasiswa</option>
               </select>
             </div>
 
@@ -616,13 +631,21 @@ export function DashboardTambahKegiatan() {
               <input type="date" value={closeDate} onChange={(e) => setCloseDate(e.target.value)} className={inputClass} />
             </div>
 
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Lokasi Kegiatan *</label>
+              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Contoh: Zoom Meeting/Selasar FIK" className={inputClass} />
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Tanggal Mulai Kegiatan {category === "Oprec" ? "(Opsional untuk Oprec)" : "*"}
+              </label>
+              <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputClass} />
+            </div>
+
             <div className="border-t border-border pt-5">
               <p className="text-xs text-muted-foreground mb-4 font-semibold uppercase tracking-wider">Opsional</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Tanggal Mulai Kegiatan</label>
-                  <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputClass} />
-                </div>
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Tanggal Selesai Kegiatan</label>
                   <input type="date" value={eventEndDate} onChange={(e) => setEventEndDate(e.target.value)} min={eventDate || undefined} className={inputClass} />
@@ -637,10 +660,6 @@ export function DashboardTambahKegiatan() {
                   <input type="time" value={eventTimeEnd} onChange={(e) => setEventTimeEnd(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Lokasi Kegiatan</label>
-                  <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Contoh: Auditorium FIK" className={inputClass} />
-                </div>
-                <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Kuota Peserta</label>
                   <input type="number" value={quota} onChange={(e) => setQuota(e.target.value)} placeholder="Kosongkan jika tidak terbatas" className={inputClass} />
                 </div>
@@ -650,9 +669,11 @@ export function DashboardTambahKegiatan() {
             {error && <p className="text-sm text-red-500">{error}</p>}
 
             <div className="flex gap-3">
-              <button onClick={handleSaveDraft} disabled={savingDraft} className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
-                {savingDraft ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan Draft</>}
-              </button>
+              {!isEditMode && (
+                <button onClick={handleSaveDraft} disabled={savingDraft} className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
+                  {savingDraft ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan Draft</>}
+                </button>
+              )}
               <button onClick={handleStep1Next} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white font-semibold hover:opacity-90 transition shadow-md shadow-[#ff6900]/20 flex items-center justify-center gap-2">
                 Lanjut <ArrowRight className="w-4 h-4" />
               </button>
@@ -688,9 +709,11 @@ export function DashboardTambahKegiatan() {
             <button onClick={() => setStep(1)} className="py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2">
               <ArrowLeft className="w-4 h-4" /> Kembali
             </button>
-            <button onClick={handleSaveDraft} disabled={savingDraft} className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
-              {savingDraft ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan Draft</>}
-            </button>
+            {!isEditMode && (
+              <button onClick={handleSaveDraft} disabled={savingDraft} className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
+                {savingDraft ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan Draft</>}
+              </button>
+            )}
             <button onClick={() => setStep(3)} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white font-semibold hover:opacity-90 transition shadow-md shadow-[#ff6900]/20 flex items-center justify-center gap-2">
               Lanjut <ArrowRight className="w-4 h-4" />
             </button>
@@ -771,14 +794,16 @@ export function DashboardTambahKegiatan() {
             <button onClick={() => setStep(2)} disabled={submitting || savingDraft} className="py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
               <ArrowLeft className="w-4 h-4" /> Kembali
             </button>
-            <button onClick={handleSaveDraft} disabled={savingDraft || submitting} className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
-              {savingDraft ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan Draft</>}
-            </button>
+            {!isEditMode && (
+              <button onClick={handleSaveDraft} disabled={savingDraft || submitting} className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-medium hover:bg-muted transition flex items-center justify-center gap-2 disabled:opacity-50">
+                {savingDraft ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><Save className="w-4 h-4" /> Simpan Draft</>}
+              </button>
+            )}
             <button onClick={handleSubmit} disabled={submitting || savingDraft} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white font-semibold hover:opacity-90 transition shadow-md shadow-[#ff6900]/20 flex items-center justify-center gap-2 disabled:opacity-50">
               {submitting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
               ) : (
-                "Publish Kegiatan"
+                isEditMode ? "Simpan Perubahan" : "Publish Kegiatan"
               )}
             </button>
           </div>

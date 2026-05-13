@@ -3,9 +3,9 @@ import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { useAuth } from "./auth-context";
 import { useTheme } from "./theme-context";
 import {
-  Flame, LogOut, ChevronDown, Sun, Moon, Menu, X,
+  Flame, LogOut, ChevronDown, Sun, Moon, Menu,
   CalendarDays, LayoutDashboard, Building2, History,
-  FolderOpen, PlusCircle, Briefcase, Loader2, User
+  FolderOpen, PlusCircle, Briefcase, Loader2, User, Home
 } from "lucide-react";
 
 interface SidebarItem {
@@ -60,6 +60,18 @@ export function DashboardLayout() {
     return <Navigate to="/login" replace />;
   }
 
+  // ── Route Guard: proteksi halaman berdasarkan role ──
+  const path = location.pathname;
+  const adminOnlyPaths = ["/dashboard/analitik", "/dashboard/daftar-ormawa"];
+  const ormawaOnlyPaths = ["/dashboard/kegiatan-kami", "/dashboard/tambah-kegiatan"];
+
+  if (profile.role !== "admin" && adminOnlyPaths.some(p => path.startsWith(p))) {
+    return <Navigate to="/dashboard/kegiatan" replace />;
+  }
+  if (profile.role !== "ormawa" && ormawaOnlyPaths.some(p => path.startsWith(p))) {
+    return <Navigate to="/dashboard/kegiatan" replace />;
+  }
+
   const items = getSidebarItems(profile.role);
 
   const roleName =
@@ -104,6 +116,10 @@ export function DashboardLayout() {
 
       {/* Bottom */}
       <div className="p-3 border-t border-border space-y-2">
+        <Link to="/" onClick={() => setSidebarOpen(false)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition">
+          <Home className="w-5 h-5" />
+          Kembali ke Beranda
+        </Link>
         <button onClick={toggleTheme} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition">
           {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           {theme === "light" ? "Mode Gelap" : "Mode Terang"}
@@ -168,16 +184,16 @@ export function DashboardLayout() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar mobile */}
-        <header className="lg:hidden sticky top-0 z-30 h-14 border-b border-border bg-background/80 backdrop-blur-xl flex items-center px-4 gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="text-foreground">
-            <Menu className="w-6 h-6" />
-          </button>
+        <header className="lg:hidden sticky top-0 z-30 h-14 border-b border-border flex items-center justify-between px-4" style={{ backgroundColor: 'var(--background)' }}>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#ff6900] to-[#ff8c3a] flex items-center justify-center">
               <Flame className="w-4 h-4 text-white" />
             </div>
             <span className="text-sm font-bold text-foreground">OrmawaEvent <span className="text-[#ff6900]">FIK</span></span>
           </div>
+          <button onClick={() => setSidebarOpen(true)} className="text-foreground">
+            <Menu className="w-6 h-6" />
+          </button>
         </header>
 
         <main className="flex-1 overflow-y-auto">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
-import { Users, Plus, ArrowRight, Calendar, MapPin, Loader2 } from "lucide-react";
+import { Users, Plus, ArrowRight, Calendar, MapPin, Loader2, Clock } from "lucide-react";
 import { useAuth } from "../../auth-context";
 import type { Event } from "../../../../lib/database.types";
 
@@ -13,15 +13,50 @@ function formatDateRange(date: string, endDate?: string | null) {
   return `${start} – ${end}`;
 }
 
+function formatTimeAMPM(start?: string | null, end?: string | null) {
+  const format = (t: string) => {
+    const [h, m] = t.split(":");
+    let hour = parseInt(h, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    hour = hour ? hour : 12; 
+    return `${hour.toString().padStart(2, '0')}:${m} ${ampm}`;
+  };
+  if (!start) return "";
+  const s = format(start);
+  if (!end) return s;
+  return `${s} - ${format(end)}`;
+}
+
 function statusLabel(event: any) {
+  let isOngoingDate = false;
+  const isOprec = event.category === "Oprec";
+  
+  if (event.date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(event.date);
+    start.setHours(0, 0, 0, 0);
+    const end = event.end_date ? new Date(event.end_date) : new Date(start);
+    end.setHours(0, 0, 0, 0);
+    if (today >= start && today <= end) {
+      isOngoingDate = true;
+    }
+  }
+
+  if (isOngoingDate && event.status !== "completed" && event.status !== "draft" && event.status !== "cancelled" && !isOprec) {
+    return { text: "Berlangsung", cls: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" };
+  }
+
   const isClosed = event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date);
   if (isClosed && event.status === "published") {
     return { text: "Ditutup", cls: "bg-red-100 dark:bg-red-500/15 text-red-500" };
   }
+  
   switch (event.status) {
     case "draft": return { text: "Draft", cls: "bg-muted text-muted-foreground" };
     case "published": return { text: "Dibuka", cls: "bg-[#ff6900]/10 text-[#ff6900]" };
-    case "ongoing": return { text: "Berlangsung", cls: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" };
+    case "ongoing": return isOprec ? { text: "Dibuka", cls: "bg-[#ff6900]/10 text-[#ff6900]" } : { text: "Berlangsung", cls: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" };
     case "completed": return { text: "Selesai", cls: "bg-muted text-muted-foreground" };
     case "cancelled": return { text: "Dibatalkan", cls: "bg-red-100 dark:bg-red-500/15 text-red-500" };
     default: return { text: event.status, cls: "bg-muted text-muted-foreground" };
@@ -165,15 +200,30 @@ export function DashboardKegiatanKami() {
                             {event.category}
                           </span>
                         )}
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                          (event as any).target_audience === "mahasiswa"
+                            ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20"
+                            : "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20"
+                        }`}>
+                          {(event as any).target_audience === "mahasiswa" ? "Mahasiswa" : "Umum & Mahasiswa"}
+                        </span>
                       </div>
                       <h3 className="text-sm font-bold text-foreground group-hover:text-[#ff6900] transition truncate">{event.title}</h3>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1.5">
-                        {event.date && <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatDateRange(event.date, event.end_date)}</div>}
-                        {event.location && <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{event.location}</div>}
-                        <div className="flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5" />
-                          {event.registrations_count}{event.quota ? `/${event.quota}` : ""} peserta
+                      <div className="flex flex-col gap-1.5 text-xs text-muted-foreground mt-1.5">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          {event.category !== "Oprec" && event.date && <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{formatDateRange(event.date, event.end_date)}</div>}
+                          {event.category !== "Oprec" && event.location && <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{event.location}</div>}
+                          <div className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5" />
+                            {event.registrations_count}{event.quota ? `/${event.quota}` : ""} peserta
+                          </div>
                         </div>
+                        {event.category !== "Oprec" && event.time_start && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5" />
+                            {formatTimeAMPM(event.time_start, event.time_end)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

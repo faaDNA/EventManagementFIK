@@ -29,6 +29,10 @@ export function DashboardProfilePage() {
       setError("Konfirmasi password tidak cocok");
       return;
     }
+    if (password.length < 6) {
+      setError("Password minimal 6 karakter");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -134,7 +138,7 @@ export function DashboardProfilePage() {
                     type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Masukkan password baru"
+                    placeholder="Minimal 6 karakter"
                     className="w-full px-4 py-2.5 pr-10 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition placeholder:text-muted-foreground/40"
                   />
                   <button
@@ -142,9 +146,12 @@ export function DashboardProfilePage() {
                     onClick={() => setShowPw(!showPw)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </button>
                 </div>
+                {password.length > 0 && password.length < 6 && (
+                  <p className="text-xs text-red-500 mt-1">Password minimal 6 karakter</p>
+                )}
               </div>
 
               <div>
@@ -162,7 +169,7 @@ export function DashboardProfilePage() {
                     onClick={() => setShowPw(!showPw)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

@@ -71,6 +71,9 @@ export function LoginPage() {
       setError(err);
     }
     // On success the browser will redirect to /dashboard via OAuth callback
+    // If user cancels popup or comes back, reset loading
+    const handleFocus = () => { setGoogleLoading(false); window.removeEventListener("focus", handleFocus); };
+    window.addEventListener("focus", handleFocus);
   };
 
   return (
@@ -129,7 +132,7 @@ export function LoginPage() {
                 onClick={() => setShowPw(!showPw)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
             </div>
             <div className="flex justify-end mt-1.5">
