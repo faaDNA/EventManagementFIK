@@ -51,6 +51,29 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+// ─── Session Lifetime ────────────────────────────────────────────────────────
+// Sesi maksimal 12 jam sejak login. Setelah itu, token berhenti di-refresh
+// dan pengguna harus login ulang. Ini mencegah akun "nyangkut" di device
+// publik (lab kampus, dll) jika pengguna lupa logout.
+const MAX_SESSION_MS = 12 * 60 * 60 * 1000; // 12 jam
+const LOGIN_TS_KEY = "login_timestamp";
+
+function isSessionExpired(): boolean {
+  const ts = localStorage.getItem(LOGIN_TS_KEY);
+  if (!ts) return false;
+  return Date.now() - parseInt(ts, 10) > MAX_SESSION_MS;
+}
+
+function stampLoginTime(): void {
+  if (!localStorage.getItem(LOGIN_TS_KEY)) {
+    localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
+  }
+}
+
+function clearLoginTime(): void {
+  localStorage.removeItem(LOGIN_TS_KEY);
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -93,8 +116,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       if (!mounted) return;
+
+      // ── Cek batas 12 jam saat pertama kali load ──
+      if (s?.user && isSessionExpired()) {
+        console.info("Sesi melebihi 12 jam, auto-logout.");
+        clearLoginTime();
+        setProfile(null);
+        setSession(null);
+        supabase.auth.signOut().catch(() => {});
+        setLoading(false);
+        return;
+      }
+
       setSession(s);
       if (s?.user) {
+        stampLoginTime(); // pastikan timestamp ada untuk sesi yang sudah ada
         const p = await fetchProfile(s.user.id, s.access_token);
         if (mounted && p) setProfile(p);
       }
@@ -103,8 +139,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    } = supabase.auth.onAuthStateChange(async (event, s) => {
       if (!mounted) return;
+
+      // ── Catat waktu login saat SIGNED_IN (email/password & OAuth) ──
+      if (event === "SIGNED_IN" && s?.user) {
+        localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
+      }
+
+      // ── Cek batas 12 jam setiap kali auth state berubah (termasuk TOKEN_REFRESHED) ──
+      if (s?.user && isSessionExpired()) {
+        console.info("Sesi melebihi 12 jam (auth state change), auto-logout.");
+        clearLoginTime();
+        setProfile(null);
+        setSession(null);
+        supabase.auth.signOut().catch(() => {});
+        return;
+      }
+
       setSession(s);
       if (s?.user) {
         // Jangan timpa profile dengan null jika sekadar network error saat token refresh
@@ -114,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setProfile(null);
+        clearLoginTime();
       }
       setLoading(false);
     });
@@ -124,6 +177,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // responsif tanpa perlu refresh manual.
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && mounted) {
+        // ── Cek batas 12 jam saat user kembali ke tab ──
+        if (isSessionExpired()) {
+          console.info("Sesi melebihi 12 jam (tab wake-up), auto-logout.");
+          clearLoginTime();
+          setProfile(null);
+          setSession(null);
+          supabase.auth.signOut().catch(() => {});
+          return;
+        }
+
         supabase.auth.getSession().then(async ({ data: { session: s } }) => {
           if (!mounted) return;
           setSession(s);
@@ -133,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             setProfile(null);
             setSession(null);
+            clearLoginTime();
           }
         });
       }
@@ -146,6 +210,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // ── Auto-Logout Timer (Realtime) ──────────────────────────────────────────
+  // Timer ini memastikan bahwa jika aplikasi tetap terbuka (tanpa di-refresh),
+  // user akan langsung di-logout tepat pada detik ke 12 jam.
+  useEffect(() => {
+    if (!session?.user) return;
+    
+    const tsStr = localStorage.getItem(LOGIN_TS_KEY);
+    if (!tsStr) return;
+
+    const ts = parseInt(tsStr, 10);
+    const elapsed = Date.now() - ts;
+    const remaining = MAX_SESSION_MS - elapsed;
+
+    if (remaining <= 0) {
+      // Jika entah bagaimana sudah lewat, langsung logout
+      clearLoginTime();
+      setProfile(null);
+      setSession(null);
+      supabase.auth.signOut().catch(() => {});
+    } else {
+      // Pasang alarm untuk sisa waktu
+      const timer = setTimeout(() => {
+        console.info("Sesi melebihi 12 jam (realtime timer), auto-logout.");
+        clearLoginTime();
+        setProfile(null);
+        setSession(null);
+        supabase.auth.signOut().catch(() => {});
+      }, remaining);
+
+      return () => clearTimeout(timer);
+    }
+  }, [session]);
+
   // ── Sign In ────────────────────────────────────────────────────────────────
 
   async function signIn(
@@ -155,10 +252,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
 
+    // Catat waktu login
+    localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
+
     // Verifikasi profil ada
     if (data.user) {
       const p = await fetchProfile(data.user.id);
       if (!p) {
+        clearLoginTime();
         await supabase.auth.signOut();
         return { error: "Profil tidak ditemukan. Harap daftar ulang atau hubungi admin." };
       }
@@ -245,6 +346,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut(): Promise<void> {
     try {
+      // Hapus timestamp login
+      clearLoginTime();
+      
       // Optimistic state clear (agar UI langsung berubah meski network lambat/hang)
       setProfile(null);
       setSession(null);

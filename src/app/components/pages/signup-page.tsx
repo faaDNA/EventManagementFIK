@@ -113,7 +113,10 @@ export function SignupPage() {
       <div className="absolute top-20 left-1/4 w-96 h-96 bg-[#ff6900]/10 rounded-full blur-[128px]" />
       <div className="absolute bottom-20 right-1/4 w-80 h-80 bg-[#ff6900]/5 rounded-full blur-[100px]" />
 
-      <GlassCard className="w-full max-w-md p-8 relative z-10">
+      <GlassCard className="w-full max-w-md p-8 relative z-10 pt-12">
+        <Link to="/" className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition text-sm font-medium">
+          <ArrowLeft className="w-4 h-4"/> Kembali
+        </Link>
         {/* Header */}
         <div className="text-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ff6900] to-[#ff8c3a] flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#ff6900]/20">
