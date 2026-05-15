@@ -81,7 +81,9 @@ export function DashboardTambahKegiatan() {
         setDescription(e.description || "");
         setCategory(e.category || "Seminar");
         setCloseDate(e.registration_close_date || "");
-        setEventDate(e.date || "");
+        // Oprec: jika date sama dengan registration_close_date (artifact auto-fill lama), kosongkan
+        const isOprec = (e.category || "Seminar") === "Oprec";
+        setEventDate(isOprec && e.date === e.registration_close_date ? "" : (e.date || ""));
         setEventEndDate(e.end_date || "");
         setEventTimeStart(e.time_start || "");
         setEventTimeEnd(e.time_end || "");
@@ -278,7 +280,7 @@ export function DashboardTambahKegiatan() {
     if (!closeDate) { setError("Tanggal penutupan pendaftaran wajib diisi"); return; }
     if (category !== "Oprec" && !eventDate) { setError("Tanggal mulai kegiatan wajib diisi"); return; }
     if (!coverPreview) { setError("Cover kegiatan wajib diupload"); return; }
-    if (!location.trim()) { setError("Lokasi kegiatan wajib diisi"); return; }
+    if (category !== "Oprec" && !location.trim()) { setError("Lokasi kegiatan wajib diisi"); return; }
     setStep(2);
   };
 
@@ -343,7 +345,7 @@ export function DashboardTambahKegiatan() {
         title: title.trim(),
         description: description.trim(),
         category,
-        date: eventDate || closeDate,
+        date: eventDate || (category === "Oprec" ? null : closeDate),
         end_date: eventEndDate || null,
         time_start: eventTimeStart || null,
         time_end: eventTimeEnd || null,
@@ -632,13 +634,13 @@ export function DashboardTambahKegiatan() {
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Lokasi Kegiatan *</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Lokasi Kegiatan {category === "Oprec" ? "(Tidak diperlukan untuk Oprec)" : "*"}</label>
               <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Contoh: Zoom Meeting/Selasar FIK" className={inputClass} />
             </div>
 
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">
-                Tanggal Mulai Kegiatan {category === "Oprec" ? "(Opsional untuk Oprec)" : "*"}
+                Tanggal Mulai Kegiatan {category === "Oprec" ? "(Tidak diperlukan untuk Oprec)" : "*"}
               </label>
               <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputClass} />
             </div>
