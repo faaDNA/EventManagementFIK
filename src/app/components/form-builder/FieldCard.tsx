@@ -129,7 +129,7 @@ export function FieldCard({ field, sections, quizMode, branchingEnabled, dragRef
               value={field.label}
               onChange={e => onUpdate(field.id, { label: e.target.value })}
               placeholder="Pertanyaan"
-              className="w-full text-base font-medium text-foreground bg-transparent border-b-2 border-transparent focus:border-[#ff6900] outline-none py-1.5 transition"
+              className="w-full text-base font-medium text-foreground bg-transparent border-b-2 border-transparent focus:border-[#ff6900] outline-none py-1.5 transition placeholder:text-muted-foreground/50"
             />
           </div>
           <button onClick={() => imgInputRef.current?.click()} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition shrink-0" title="Upload gambar">
@@ -228,24 +228,21 @@ export function FieldCard({ field, sections, quizMode, branchingEnabled, dragRef
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Minimum</label>
-                <select value={field.scaleMin || 1} onChange={e => onUpdate(field.id, { scaleMin: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-sm focus:outline-none">
-                  {[0, 1].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+                <div className="w-full px-3 py-2 rounded-xl bg-muted/50 border border-border text-sm text-muted-foreground cursor-not-allowed">1</div>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Maksimum</label>
                 <select value={field.scaleMax || 5} onChange={e => onUpdate(field.id, { scaleMax: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-sm focus:outline-none">
-                  {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none">
+                  {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n} className="bg-popover text-foreground">{n}</option>)}
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <input value={field.scaleMinLabel || ""} onChange={e => onUpdate(field.id, { scaleMinLabel: e.target.value })}
-                placeholder="Label min (opsional)" className="px-3 py-2 rounded-xl bg-card border border-border text-sm focus:outline-none" />
+                placeholder="Label min (opsional)" className="px-3 py-2 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none placeholder:text-muted-foreground/50" />
               <input value={field.scaleMaxLabel || ""} onChange={e => onUpdate(field.id, { scaleMaxLabel: e.target.value })}
-                placeholder="Label max (opsional)" className="px-3 py-2 rounded-xl bg-card border border-border text-sm focus:outline-none" />
+                placeholder="Label max (opsional)" className="px-3 py-2 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none placeholder:text-muted-foreground/50" />
             </div>
           </div>
         )}

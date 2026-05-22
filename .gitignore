@@ -22,6 +22,9 @@ npm-debug.log*
 *.njsproj
 *.sln
 
+# UML Documentation
+uml/
+
 # OS
 .DS_Store
 Thumbs.db

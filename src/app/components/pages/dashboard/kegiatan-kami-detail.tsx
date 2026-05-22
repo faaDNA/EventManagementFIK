@@ -530,9 +530,14 @@ export function DashboardKegiatanKamiDetail() {
                   let text = event.status;
                   let bg = "bg-[#ff6900]/80 text-white";
 
+                  const isClosed = event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date);
+
                   if (isActuallyOngoing) {
                     text = "Berlangsung";
                     bg = "bg-emerald-500/80 text-white";
+                  } else if (isClosed && event.status === "published") {
+                    text = "Ditutup";
+                    bg = "bg-red-500/80 text-white";
                   } else if (event.status === "published") {
                     text = "Dibuka";
                     bg = "bg-[#ff6900]/80 text-white";
@@ -733,9 +738,14 @@ export function DashboardKegiatanKamiDetail() {
                   let text = event.status;
                   let bg = "bg-[#ff6900]/10 text-[#ff6900]";
 
+                  const isClosed = event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date);
+
                   if (isActuallyOngoing) {
                     text = "Berlangsung";
                     bg = "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                  } else if (isClosed && event.status === "published") {
+                    text = "Ditutup";
+                    bg = "bg-red-50 dark:bg-red-500/10 text-red-500";
                   } else if (event.status === "published") {
                     text = "Dibuka";
                     bg = "bg-[#ff6900]/10 text-[#ff6900]";

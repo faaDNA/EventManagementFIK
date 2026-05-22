@@ -1,5 +1,5 @@
 -- ============================================================
--- OrmawaEvent FIK — Database Schema v1.1
+-- OrmawaEvent FIK — Database Schema v1.2
 -- Jalankan di: Supabase Dashboard > SQL Editor > New Query
 -- ============================================================
 
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS ormawa (
   name        TEXT NOT NULL,           -- "HIMTI"
   full_name   TEXT NOT NULL,           -- "Himpunan Mahasiswa Teknik Informatika"
   email       TEXT,
+  instagram   TEXT,                    -- akun instagram ormawa
   is_active   BOOLEAN DEFAULT TRUE,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
@@ -91,7 +92,7 @@ CREATE TABLE IF NOT EXISTS events (
                             'Oprec','Pelatihan','Lainnya'
                           )),
   cover_url               TEXT,        -- path di Supabase Storage bucket event-covers
-  date                    DATE NOT NULL,
+  date                    DATE,
   end_date                DATE,        -- null = 1 hari
   time_start              TIME,
   time_end                TIME,
