@@ -300,6 +300,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) return { error: error.message };
 
+    // Supabase dengan email confirmation: jika email sudah terdaftar,
+    // signUp tetap sukses tapi mengembalikan user dengan identities kosong.
+    if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+      return { error: "Email ini sudah terdaftar. Silakan login." };
+    }
+
     // If email confirmation is disabled the user object is already present
     const userId = data.user?.id;
     if (userId) {

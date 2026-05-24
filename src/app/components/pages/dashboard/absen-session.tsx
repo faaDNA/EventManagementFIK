@@ -153,6 +153,7 @@ export function AbsenSession() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraDenied, setCameraDenied] = useState(false);
   const [scanResult, setScanResult] = useState<"success" | "error" | null>(null);
   const [scanning, setScanning] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -236,12 +237,9 @@ export function AbsenSession() {
       streamRef.current = stream;
       setCameraActive(true);
       setScanning(true);
-    } catch (err) { 
-      console.warn("Gagal membuka kamera asli, beralih ke mode simulasi:", err);
-      // Fallback: biarkan UI scanning berjalan meskipun kamera tidak aktif 
-      // (Bermanfaat untuk testing di local network tanpa HTTPS)
-      setCameraActive(true);
-      setScanning(true);
+    } catch (err: any) {
+      console.warn("Gagal membuka kamera:", err);
+      setCameraDenied(true);
     }
   };
 
@@ -534,14 +532,28 @@ export function AbsenSession() {
                       </p>
                     </div>
                   </>
+                ) : cameraDenied ? (
+                  <div className="flex flex-col items-center gap-4 p-8 text-center">
+                    <div className="w-20 h-20 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                      <Camera className="w-10 h-10 text-red-500" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold mb-1">Izin Kamera Ditolak</p>
+                      <p className="text-xs text-white/60">Aktifkan izin kamera di pengaturan browser untuk scan QR</p>
+                    </div>
+                    <button onClick={() => { setCameraDenied(false); startCamera(); }}
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white font-semibold text-sm hover:opacity-90 transition shadow-lg shadow-[#ff6900]/20 flex items-center gap-2">
+                      <Camera className="w-4 h-4" /> Coba Lagi
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center gap-4 p-8 text-center">
                     <div className="w-20 h-20 rounded-2xl bg-[#ff6900]/10 flex items-center justify-center">
                       <Camera className="w-10 h-10 text-[#ff6900]" />
                     </div>
                     <div>
-                      <p className="text-foreground font-semibold mb-1">Scanner QR Code</p>
-                      <p className="text-xs text-muted-foreground">Buka kamera untuk scan QR presensi</p>
+                      <p className="text-white font-semibold mb-1">Scanner QR Code</p>
+                      <p className="text-xs text-white/60">Buka kamera untuk scan QR presensi</p>
                     </div>
                     <button onClick={startCamera}
                       className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] text-white font-semibold text-sm hover:opacity-90 transition shadow-lg shadow-[#ff6900]/20 flex items-center gap-2">

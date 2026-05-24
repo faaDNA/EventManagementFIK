@@ -126,7 +126,8 @@ export function DashboardKegiatanKamiDetail() {
   const [editDescription, setEditDescription] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
-  const [editTime, setEditTime] = useState("");
+  const [editTimeStart, setEditTimeStart] = useState("");
+  const [editTimeEnd, setEditTimeEnd] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editQuota, setEditQuota] = useState("");
   const [editCloseDate, setEditCloseDate] = useState("");
@@ -145,7 +146,8 @@ export function DashboardKegiatanKamiDetail() {
     setEditDescription(event.description || "");
     setEditDate(event.date);
     setEditEndDate(event.end_date || "");
-    setEditTime([event.time_start, event.time_end].filter(Boolean).join(" - "));
+    setEditTimeStart(event.time_start || "");
+    setEditTimeEnd(event.time_end || "");
     setEditLocation(event.location || "");
     setEditQuota(event.quota?.toString() || "");
     setEditCloseDate(event.registration_close_date || "");
@@ -176,7 +178,7 @@ export function DashboardKegiatanKamiDetail() {
     try {
       const url = import.meta.env.VITE_SUPABASE_URL as string;
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      
+
       let finalCoverUrl = editCover;
 
       if (coverFile) {
@@ -202,9 +204,8 @@ export function DashboardKegiatanKamiDetail() {
         }
       }
 
-      const timeParts = editTime.split("-").map(t => t.trim());
-      const timeStart = timeParts[0] || null;
-      const timeEnd = timeParts[1] || null;
+      const timeStart = editTimeStart || null;
+      const timeEnd = editTimeEnd || null;
 
       const payload: Record<string, any> = {
         title: editTitle,
@@ -292,7 +293,8 @@ export function DashboardKegiatanKamiDetail() {
     setEditDescription(event.description || "");
     setEditDate(event.date);
     setEditEndDate(event.end_date || "");
-    setEditTime([event.time_start, event.time_end].filter(Boolean).join(" - "));
+    setEditTimeStart(event.time_start || "");
+    setEditTimeEnd(event.time_end || "");
     setEditLocation(event.location || "");
     setEditQuota(event.quota?.toString() || "");
     setEditCloseDate(event.registration_close_date || "");
@@ -316,7 +318,7 @@ export function DashboardKegiatanKamiDetail() {
     try {
       const url = import.meta.env.VITE_SUPABASE_URL as string;
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      
+
       const payload = {
         event_id: id,
         name: presensiName,
@@ -363,7 +365,7 @@ export function DashboardKegiatanKamiDetail() {
     try {
       const url = import.meta.env.VITE_SUPABASE_URL as string;
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      
+
       const res = await fetch(`${url}/rest/v1/attendance_sessions?id=eq.${sid}`, {
         method: "DELETE",
         headers: {
@@ -412,7 +414,7 @@ export function DashboardKegiatanKamiDetail() {
           const formId = forms[0].id;
           // Fetch field labels
           const fieldRes = await fetch(
-            `${url}/rest/v1/form_fields?form_id=eq.${formId}&order=order_index.asc&select=id,label,type`,
+            `${url}/rest/v1/form_fields?form_id=eq.${formId}&order=order_index.asc&select=id,label,type,options`,
             { headers, signal: AbortSignal.timeout(15000) }
           );
           if (fieldRes.ok) {
@@ -530,7 +532,7 @@ export function DashboardKegiatanKamiDetail() {
                   let text = event.status;
                   let bg = "bg-[#ff6900]/80 text-white";
 
-                  const isClosed = event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date);
+                  const isClosed = event.registration_close_date && new Date(new Date().setHours(0, 0, 0, 0)) > new Date(event.registration_close_date);
 
                   if (isActuallyOngoing) {
                     text = "Berlangsung";
@@ -573,11 +575,10 @@ export function DashboardKegiatanKamiDetail() {
                     <option value="mahasiswa" className="bg-black text-white">Mahasiswa</option>
                   </select>
                 ) : (
-                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold backdrop-blur-md border ${
-                    editTargetAudience === "mahasiswa" 
-                      ? "bg-blue-500/80 text-white border-blue-400/30" 
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold backdrop-blur-md border ${editTargetAudience === "mahasiswa"
+                      ? "bg-blue-500/80 text-white border-blue-400/30"
                       : "bg-purple-500/80 text-white border-purple-400/30"
-                  }`}>
+                    }`}>
                     {editTargetAudience === "mahasiswa" ? "Mahasiswa" : "Umum & Mahasiswa"}
                   </span>
                 )}
@@ -654,9 +655,18 @@ export function DashboardKegiatanKamiDetail() {
                     <div className="flex-1">
                       <p className="text-[11px] text-muted-foreground mb-0.5">Waktu</p>
                       {isEditing ? (
-                        <input type="text" value={editTime} onChange={(e) => setEditTime(e.target.value)} placeholder="09:00 - 12:00" className={inputClass} />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground/60 mb-0.5">Mulai</p>
+                            <input type="time" value={editTimeStart} onChange={(e) => setEditTimeStart(e.target.value)} className={inputClass} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground/60 mb-0.5">Selesai</p>
+                            <input type="time" value={editTimeEnd} onChange={(e) => setEditTimeEnd(e.target.value)} className={inputClass} />
+                          </div>
+                        </div>
                       ) : (
-                        <p className="text-sm font-medium text-foreground">{formatTimeStringToAMPM(editTime)}</p>
+                        <p className="text-sm font-medium text-foreground">{editTimeStart || editTimeEnd ? formatTimeStringToAMPM([editTimeStart, editTimeEnd].filter(Boolean).join(" - ")) : "-"}</p>
                       )}
                     </div>
                   </div>
@@ -738,7 +748,7 @@ export function DashboardKegiatanKamiDetail() {
                   let text = event.status;
                   let bg = "bg-[#ff6900]/10 text-[#ff6900]";
 
-                  const isClosed = event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date);
+                  const isClosed = event.registration_close_date && new Date(new Date().setHours(0, 0, 0, 0)) > new Date(event.registration_close_date);
 
                   if (isActuallyOngoing) {
                     text = "Berlangsung";

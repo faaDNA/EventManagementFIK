@@ -306,7 +306,8 @@ export function DashboardEventDetail() {
               <Users className="w-4 h-4 text-[#ff6900]" />
               <div>
                 <p className="text-[11px] text-muted-foreground">Kuota</p>
-                <p className="text-sm font-medium text-foreground">{event.quota ? `${registrationsCount}/${event.quota}` : "Tidak terbatas"}</p>
+                <p className="text-sm font-medium text-foreground">{event.quota != null ? `${registrationsCount}/${event.quota}` : "Tidak Terbatas"}</p>
+                {event.quota == null && <p className="text-[11px] text-muted-foreground">{registrationsCount} pendaftar</p>}
               </div>
             </div>
 

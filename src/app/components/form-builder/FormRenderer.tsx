@@ -354,10 +354,10 @@ export function FormRenderer({
                     checked ? "border-[#ff6900]/30 bg-[#ff6900]/5" : "border-border hover:border-[#ff6900]/20 hover:bg-muted/50"
                   } ${readOnly ? "pointer-events-none" : ""}`}
                 >
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${
+                  <div className={`w-5 h-5 rounded-[4px] border-2 flex items-center justify-center shrink-0 transition ${
                     checked ? "border-[#ff6900] bg-[#ff6900]" : "border-border group-hover:border-[#ff6900]/40"
                   }`}>
-                    {checked && <CheckCircle2 className="w-3 h-3 text-white" />}
+                    {checked && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6l2.5 2.5 4.5-5" /></svg>}
                   </div>
                   <span className={`text-sm flex-1 ${checked ? "text-foreground font-medium" : "text-muted-foreground"}`}>{opt.label}</span>
                   <input type="checkbox" checked={checked}

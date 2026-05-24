@@ -252,9 +252,9 @@ export function HomePage() {
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
-                        {event.quota ? `Kuota: ${event.registered}/${event.quota}` : `${event.registered} pendaftar`}
+                        {event.quota != null ? `Kuota: ${event.registered}/${event.quota}` : `Tidak Terbatas · ${event.registered} pendaftar`}
                       </span>
-                      {event.quota ? (
+                      {event.quota != null ? (
                         <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
                           <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a]" style={{ width: `${(event.registered / event.quota) * 100}%` }} />
                         </div>

@@ -45,7 +45,7 @@ export function ForgotPasswordPage() {
               <MailCheck className="w-8 h-8 text-emerald-500" />
             </div>
             <p className="text-muted-foreground text-sm mb-2">
-              Kami telah mengirimkan link untuk me-reset password ke <span className="font-semibold text-foreground">{email}</span>.
+              Jika <span className="font-semibold text-foreground">{email}</span> terdaftar, kami telah mengirimkan link untuk me-reset password.
             </p>
             <p className="text-xs text-muted-foreground mb-6">
               Jika email tidak muncul di Inbox, cek folder <span className="font-semibold">Spam</span>.

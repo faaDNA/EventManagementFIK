@@ -135,7 +135,7 @@ export function EventDetailPage() {
 
   if (!event) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Event tidak ditemukan</div>;
 
-  const isFull = event.registered >= event.quota;
+  const isFull = event.quota != null && event.registered >= event.quota;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] max-w-5xl mx-auto px-4 py-8">
@@ -253,13 +253,23 @@ export function EventDetailPage() {
                 <Users className="w-4 h-4 text-[#ff6900]" />
               </div>
               <div className="w-full">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-xs text-muted-foreground">Kuota Peserta</p>
-                  <span className="text-xs font-medium text-foreground bg-muted px-2 py-0.5 rounded-md">{event.registered} / {event.quota}</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] transition-all duration-1000" style={{ width: `${Math.min((event.registered / event.quota) * 100, 100)}%` }} />
-                </div>
+                {event.quota != null ? (
+                  <>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-xs text-muted-foreground">Kuota Peserta</p>
+                      <span className="text-xs font-medium text-foreground bg-muted px-2 py-0.5 rounded-md">{event.registered} / {event.quota}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#ff6900] to-[#ff8c3a] transition-all duration-1000" style={{ width: `${Math.min((event.registered / event.quota) * 100, 100)}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground mb-0.5">Kuota Peserta</p>
+                    <p className="text-sm font-semibold text-foreground">Tidak Terbatas</p>
+                    <p className="text-xs text-muted-foreground mt-1">{event.registered} pendaftar</p>
+                  </>
+                )}
               </div>
             </div>
 

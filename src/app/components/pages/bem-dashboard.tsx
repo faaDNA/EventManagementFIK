@@ -126,7 +126,7 @@ export function BEMDashboard() {
       persentaseHadir: totalPendaftar ? Math.round((totalHadir / totalPendaftar) * 100) : 0,
       persentaseHadirBulanIni: pendaftarBulanIni ? Math.round((hadirBulanIni / pendaftarBulanIni) * 100) : 0,
     });
-    
+
     setMonthlyChart(last12Months.map(m => ({
       month: m.month,
       mahasiswa: m.mahasiswa,
@@ -166,7 +166,7 @@ export function BEMDashboard() {
       setError("Password minimal 6 karakter");
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -363,20 +363,20 @@ export function BEMDashboard() {
 
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Nama Ormawa</label>
-                <input type="text" placeholder="Contoh: HIMTI" value={newOrmawa.name} onChange={e => setNewOrmawa({...newOrmawa, name: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
+                <input type="text" placeholder="Contoh: HIMA" value={newOrmawa.name} onChange={e => setNewOrmawa({ ...newOrmawa, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Nama Lengkap</label>
-                <input type="text" placeholder="Himpunan Mahasiswa Teknik Informatika" value={newOrmawa.fullName} onChange={e => setNewOrmawa({...newOrmawa, fullName: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
+                <input type="text" placeholder="Himpunan Mahasiswa" value={newOrmawa.fullName} onChange={e => setNewOrmawa({ ...newOrmawa, fullName: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Email Akun</label>
-                <input type="email" placeholder="ormawa@upnvj.ac.id" value={newOrmawa.email} onChange={e => setNewOrmawa({...newOrmawa, email: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
+                <input type="email" placeholder="ormawa@upnvj.ac.id" value={newOrmawa.email} onChange={e => setNewOrmawa({ ...newOrmawa, email: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Password</label>
                 <div className="relative">
-                  <input type={showPassword ? "text" : "password"} placeholder="Buat password akun" value={newOrmawa.password} onChange={e => setNewOrmawa({...newOrmawa, password: e.target.value})} className="w-full px-4 py-2.5 pr-10 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
+                  <input type={showPassword ? "text" : "password"} placeholder="Buat password akun" value={newOrmawa.password} onChange={e => setNewOrmawa({ ...newOrmawa, password: e.target.value })} className="w-full px-4 py-2.5 pr-10 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition placeholder:text-muted-foreground/40" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </button>

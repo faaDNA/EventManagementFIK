@@ -10,6 +10,7 @@ export function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -111,7 +112,7 @@ export function ResetPasswordPage() {
               <label className="text-xs text-muted-foreground mb-1 block">Konfirmasi Password</label>
               <div className="relative">
                 <input
-                  type={showPw ? "text" : "password"}
+                  type={showConfirmPw ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Ketik ulang password baru"
@@ -119,10 +120,10 @@ export function ResetPasswordPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPw(!showPw)}
+                  onClick={() => setShowConfirmPw(!showConfirmPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  {showConfirmPw ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
             </div>

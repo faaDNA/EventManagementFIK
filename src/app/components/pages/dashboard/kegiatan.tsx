@@ -294,7 +294,7 @@ export function DashboardKegiatan() {
                       <div className="flex items-center gap-2">
                         <Users className="w-3.5 h-3.5 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
-                          {event.quota ? `Kuota: ${event.registrations_count || 0}/${event.quota}` : `${event.registrations_count || 0} pendaftar`}
+                          {event.quota != null ? `Kuota: ${event.registrations_count || 0}/${event.quota}` : `Tidak Terbatas · ${event.registrations_count || 0} pendaftar`}
                         </span>
                       </div>
                     </div>
