@@ -455,7 +455,7 @@ export function DashboardKegiatanKamiDetail() {
       };
 
       // 3. Build CSV
-      const csvHeaders = ["Nama", "NIM", "Email", "Kategori", "Status", "Tanggal Daftar"];
+      const csvHeaders = ["Nama", "NIM", "Email", "Kategori", "Tanggal Daftar"];
       formFieldLabels.forEach(f => csvHeaders.push(f.label));
 
       const csvRows = (data || []).map((r: any) => {
@@ -464,7 +464,6 @@ export function DashboardKegiatanKamiDetail() {
           r.profiles?.nim || "-",
           r.profiles?.email || "-",
           r.profiles?.nim ? "Mahasiswa" : "Umum",
-          r.status || "confirmed",
           r.registered_at ? new Date(r.registered_at).toLocaleDateString("id-ID") : "-",
         ];
         if (formFieldLabels.length > 0) {

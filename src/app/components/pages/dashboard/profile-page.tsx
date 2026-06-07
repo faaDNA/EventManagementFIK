@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { useAuth } from "../../auth-context";
 import { GlassCard } from "../../glass-card";
-import { User, Mail, CreditCard, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
+import { User, Mail, CreditCard, KeyRound, Loader2, Eye, EyeOff, Edit2, X, Check } from "lucide-react";
 
 export function DashboardProfilePage() {
-  const { profile, updatePassword } = useAuth();
+  const { profile, updatePassword, updateProfile } = useAuth();
   
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState(profile?.full_name || "");
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameSuccess, setNameSuccess] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -53,6 +57,30 @@ export function DashboardProfilePage() {
     }
   };
 
+  const handleNameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName.trim()) {
+      setError("Nama lengkap tidak boleh kosong");
+      return;
+    }
+
+    setNameLoading(true);
+    try {
+      const { error: err } = await updateProfile({ full_name: editName.trim() });
+      if (err) {
+        setError(err);
+      } else {
+        setNameSuccess("Nama berhasil diubah");
+        setIsEditingName(false);
+        setTimeout(() => setNameSuccess(""), 3000);
+      }
+    } catch (err: any) {
+      setError(err.message || "Terjadi kesalahan.");
+    } finally {
+      setNameLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <div>
@@ -80,9 +108,33 @@ export function DashboardProfilePage() {
             <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center shrink-0">
               <User className="w-5 h-5 text-muted-foreground" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-muted-foreground">Nama Lengkap</p>
-              <p className="text-sm font-medium text-foreground">{profile.full_name}</p>
+              {isEditingName ? (
+                <form onSubmit={handleNameSubmit} className="mt-1 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-input-background border border-border text-sm text-foreground focus:border-[#ff6900]/50 focus:outline-none focus:ring-1 focus:ring-[#ff6900]/50 transition"
+                    autoFocus
+                  />
+                  <button type="submit" disabled={nameLoading} className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition disabled:opacity-50">
+                    {nameLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  </button>
+                  <button type="button" onClick={() => { setIsEditingName(false); setEditName(profile.full_name); }} className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition">
+                    <X className="w-4 h-4" />
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between mt-0.5">
+                  <p className="text-sm font-medium text-foreground">{profile.full_name}</p>
+                  <button onClick={() => setIsEditingName(true)} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-[#ff6900] bg-[#ff6900]/10 hover:bg-[#ff6900]/20 transition">
+                    <Edit2 className="w-3 h-3" /> Edit
+                  </button>
+                </div>
+              )}
+              {nameSuccess && <p className="text-[10px] text-emerald-500 mt-0.5">{nameSuccess}</p>}
             </div>
           </div>
 

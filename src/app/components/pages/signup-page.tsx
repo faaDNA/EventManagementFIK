@@ -223,11 +223,10 @@ export function SignupPage() {
                 <input
                   type="text"
                   value={nim}
-                  onChange={(e) => setNim(e.target.value)}
-                  placeholder="Contoh: 2210511001"
-                  className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition placeholder:text-muted-foreground/40"
+                  readOnly
+                  className="w-full px-4 py-2.5 rounded-xl bg-muted/30 border border-border text-foreground/70 text-sm focus:outline-none cursor-not-allowed"
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">NIM otomatis terdeteksi dari email, bisa diubah jika diperlukan</p>
+                <p className="text-[10px] text-muted-foreground mt-1">NIM otomatis terdeteksi dari email</p>
               </div>
             )}
 

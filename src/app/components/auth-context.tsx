@@ -33,6 +33,8 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   /** Update Password (after following reset link) */
   updatePassword: (password: string) => Promise<{ error: string | null }>;
+  /** Update Profile (e.g. full_name) */
+  updateProfile: (data: { full_name: string }) => Promise<{ error: string | null }>;
   /** Sign out */
   signOut: () => Promise<void>;
 }
@@ -48,6 +50,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => ({ error: null }),
   resetPassword: async () => ({ error: null }),
   updatePassword: async () => ({ error: null }),
+  updateProfile: async () => ({ error: null }),
   signOut: async () => {},
 });
 
@@ -110,6 +113,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /**
+   * Google OAuth tidak mengirim NIM/role di metadata.
+   * Jika email @mahasiswa.upnvj.ac.id tapi profil belum lengkap, patch otomatis.
+   */
+  async function ensureProfileComplete(
+    profile: Profile,
+    accessToken: string
+  ): Promise<Profile> {
+    const email = profile.email || "";
+    const isMahasiswa = email.endsWith("@mahasiswa.upnvj.ac.id");
+    if (!isMahasiswa) return profile;
+
+    const expectedNim = email.split("@")[0];
+    const needsUpdate =
+      profile.role !== "mahasiswa" ||
+      !profile.nim ||
+      profile.nim !== expectedNim;
+
+    if (!needsUpdate) return profile;
+
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL as string;
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      await fetch(`${url}/rest/v1/profiles?id=eq.${profile.id}`, {
+        method: "PATCH",
+        headers: {
+          "apikey": key,
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ role: "mahasiswa", nim: expectedNim }),
+      });
+      return { ...profile, role: "mahasiswa", nim: expectedNim };
+    } catch (err) {
+      console.warn("ensureProfileComplete error:", err);
+      return profile;
+    }
+  }
+
   // Bootstrap: read existing session once on mount, then subscribe to changes
   useEffect(() => {
     let mounted = true;
@@ -130,9 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSession(s);
       if (s?.user) {
-        stampLoginTime(); // pastikan timestamp ada untuk sesi yang sudah ada
-        const p = await fetchProfile(s.user.id, s.access_token);
-        if (mounted && p) setProfile(p);
+        stampLoginTime();
+        let p = await fetchProfile(s.user.id, s.access_token);
+        if (mounted && p) {
+          p = await ensureProfileComplete(p, s.access_token!);
+          setProfile(p);
+        }
       }
       setLoading(false);
     });
@@ -160,8 +206,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       if (s?.user) {
         // Jangan timpa profile dengan null jika sekadar network error saat token refresh
-        const p = await fetchProfile(s.user.id, s.access_token);
+        let p = await fetchProfile(s.user.id, s.access_token);
         if (mounted && p) {
+          p = await ensureProfileComplete(p, s.access_token!);
           setProfile(p);
         }
       } else {
@@ -348,6 +395,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
+  // ── Update Profile ────────────────────────────────────────────────────────
+
+  async function updateProfile(data: { full_name: string }): Promise<{ error: string | null }> {
+    if (!session?.user?.id || !session?.access_token) return { error: "Belum login." };
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL as string;
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      const res = await fetch(`${url}/rest/v1/profiles?id=eq.${session.user.id}`, {
+        method: "PATCH",
+        headers: {
+          "apikey": key,
+          "Authorization": `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        return { error: errData.message || "Gagal update profil." };
+      }
+
+      // Optimistic update
+      if (profile) setProfile({ ...profile, ...data });
+      return { error: null };
+    } catch (err: any) {
+      return { error: err.message || "Terjadi kesalahan koneksi." };
+    }
+  }
+
   // ── Sign Out ──────────────────────────────────────────────────────────────
 
   async function signOut(): Promise<void> {
@@ -368,7 +446,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, signIn, signUp, signInWithGoogle, resetPassword, updatePassword, signOut }}
+      value={{ session, profile, loading, signIn, signUp, signInWithGoogle, resetPassword, updatePassword, updateProfile, signOut }}
     >
       {children}
     </AuthContext.Provider>
