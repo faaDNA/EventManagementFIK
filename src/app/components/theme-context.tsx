@@ -1,3 +1,11 @@
+/**
+ * @file theme-context.tsx
+ * @description Context provider untuk dark/light mode.
+ *
+ * Menyimpan preferensi tema di localStorage (key: "oe-theme").
+ * Menambah/hapus class "dark" di `<html>` untuk Tailwind CSS dark mode.
+ * Diakses oleh komponen manapun melalui hook `useTheme()`.
+ */
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 type Theme = "light" | "dark";
@@ -27,9 +35,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("oe-theme", theme);
   }, [theme]);
 
+  /** Toggle antara dark dan light mode. */
   const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
 }
 
+/** Hook untuk mengakses tema saat ini dan fungsi toggle dari komponen manapun. */
 export const useTheme = () => useContext(ThemeContext);

@@ -1,3 +1,10 @@
+/**
+ * @file kegiatan-kami.tsx
+ * @description Halaman "Kegiatan Kami" — daftar semua kegiatan milik ormawa yang sedang login.
+ *
+ * Menampilkan kegiatan aktif (bukan completed) dengan status badge, jumlah pendaftar,
+ * dan navigasi ke halaman detail/edit. Draft kegiatan diarahkan ke halaman edit.
+ */
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
@@ -5,6 +12,7 @@ import { Users, Plus, ArrowRight, Calendar, MapPin, Loader2, Clock } from "lucid
 import { useAuth } from "../../auth-context";
 import type { Event } from "../../../../lib/database.types";
 
+/** Format rentang tanggal ke Bahasa Indonesia. */
 function formatDateRange(date: string, endDate?: string | null) {
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
   const start = new Date(date).toLocaleDateString("id-ID", opts);
@@ -13,6 +21,7 @@ function formatDateRange(date: string, endDate?: string | null) {
   return `${start} – ${end}`;
 }
 
+/** Format waktu dari HH:MM ke format 12-jam (AM/PM). */
 function formatTimeAMPM(start?: string | null, end?: string | null) {
   const format = (t: string) => {
     const [h, m] = t.split(":");
@@ -28,6 +37,10 @@ function formatTimeAMPM(start?: string | null, end?: string | null) {
   return `${s} - ${format(end)}`;
 }
 
+/**
+ * Tentukan label status dan warna badge berdasarkan status event dan tanggal.
+ * Mempertimbangkan: ongoing berdasarkan tanggal, pendaftaran ditutup, dan kategori Oprec.
+ */
 function statusLabel(event: any) {
   let isOngoingDate = false;
   const isOprec = event.category === "Oprec";

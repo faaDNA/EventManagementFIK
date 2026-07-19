@@ -1,3 +1,10 @@
+/**
+ * @file forgot-password-page.tsx
+ * @description Halaman lupa password — user memasukkan email untuk menerima link reset.
+ *
+ * Menggunakan pesan netral "Jika email terdaftar, link reset telah dikirim"
+ * untuk mencegah enumerasi akun (keamanan: tidak membocorkan email mana yang terdaftar).
+ */
 import React, { useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../auth-context";
@@ -11,6 +18,10 @@ export function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  /**
+   * Submit email untuk reset password.
+   * Selalu tampilkan pesan sukses (security: jangan bocorkan apakah email terdaftar).
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

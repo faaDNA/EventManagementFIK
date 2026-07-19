@@ -1,8 +1,15 @@
+/**
+ * @file FieldCard.tsx
+ * @description Komponen kartu untuk masing-masing field di FormBuilder.
+ *
+ * Mengatur tampilan dan input konfigurasi field (label, validasi, autofill, dll).
+ * Menangani mode kuis (jawaban benar & poin) dan percabangan (goToSection).
+ */
 import React, { useRef, useState } from "react";
 import {
   Type, AlignLeft, CircleDot, CheckSquare, ChevronDown, BarChart3,
   Upload, Trash2, GripVertical, Plus, X, Award, ShieldCheck, Copy,
-  MoreVertical, ImagePlus, Tag, User, Hash, AtSign
+  MoreVertical, ImagePlus, Tag, User, Hash, AtSign, GraduationCap, BookOpen
 } from "lucide-react";
 import type { FormField, FormSection, FieldType, FieldOption, ValidationRule, AutofillTag } from "./types";
 import { FIELD_TYPE_META, TEXT_VALIDATION_OPTIONS, PARAGRAPH_VALIDATION_OPTIONS, CHECKBOX_VALIDATION_OPTIONS } from "./types";
@@ -11,6 +18,8 @@ const AUTOFILL_TAGS: { value: AutofillTag; label: string; icon: React.ReactNode;
   { value: "nama", label: "Nama", icon: <User className="w-3.5 h-3.5" />, desc: "Otomatis terisi nama akun" },
   { value: "nim", label: "NIM", icon: <Hash className="w-3.5 h-3.5" />, desc: "Otomatis terisi NIM mahasiswa" },
   { value: "akun", label: "Email", icon: <AtSign className="w-3.5 h-3.5" />, desc: "Otomatis terisi email akun" },
+  { value: "fakultas", label: "Fakultas", icon: <GraduationCap className="w-3.5 h-3.5" />, desc: "Otomatis terisi fakultas mahasiswa" },
+  { value: "jurusan", label: "Jurusan", icon: <BookOpen className="w-3.5 h-3.5" />, desc: "Otomatis terisi jurusan mahasiswa" },
 ];
 
 const FIELD_TYPE_ICONS: Record<FieldType, React.ReactNode> = {

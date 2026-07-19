@@ -1,12 +1,27 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router";
+/**
+ * @file presensi-session.tsx
+ * @description Halaman manajemen sesi presensi untuk ormawa.
+ *
+ * Fitur utama:
+ * - Tampilkan daftar peserta yang sudah hadir/belum hadir
+ * - Toggle buka/tutup sesi presensi
+ * - QR Code: generate QR via `qrcode.react` (QRCodeSVG) untuk di-scan peserta
+ * - Form presensi: desain form via FormBuilder, lihat jawaban peserta
+ * - Jadwal otomatis: auto-open dan auto-close sesi
+ * - Toggle kehadiran manual per peserta
+ * - Export data kehadiran ke CSV (termasuk skor quiz jika ada)
+ */
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router";
 import { QRCodeSVG } from "qrcode.react";
 import { GlassCard } from "../../glass-card";
 import { useAuth } from "../../auth-context";
 import {
   ArrowLeft, QrCode, FileText, Clock, Users, Download,
-  X, CheckCircle2, XCircle, ToggleLeft, Eye, EyeOff, Loader2, Save
+  X, CheckCircle2, XCircle, ToggleLeft, Loader2, Save, FileDown
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { FormBuilder } from "../../form-builder/FormBuilder";
 import { FormRenderer } from "../../form-builder/FormRenderer";
 import type { FormField, FormSection } from "../../form-builder/types";
@@ -17,6 +32,7 @@ interface Attendee {
   nim: string | null;
   email: string;
   hadir: boolean;
+  score?: number | null;
 }
 
 export function PresensiSession() {
@@ -81,6 +97,10 @@ export function PresensiSession() {
         const headers: Record<string, string> = { "apikey": key };
         if (session?.access_token) headers["Authorization"] = `Bearer ${session.access_token}`;
 
+        let localFormId: string | null = null;
+        let localQuizMode = false;
+        let localMappedFields: FormField[] = [];
+
         // 1. Fetch Session Detail
         const sessRes = await fetch(`${url}/rest/v1/attendance_sessions?id=eq.${sessionId}`, { headers, signal: AbortSignal.timeout(15000) });
         if (sessRes.ok) {
@@ -113,6 +133,7 @@ export function PresensiSession() {
             // Load form if form_id exists
             if (s.form_id) {
               setFormId(s.form_id);
+              localFormId = s.form_id;
               // Fetch form metadata
               const formMetaRes = await fetch(`${url}/rest/v1/forms?id=eq.${s.form_id}`, { headers, signal: AbortSignal.timeout(15000) });
               if (formMetaRes.ok) {
@@ -120,6 +141,7 @@ export function PresensiSession() {
                 if (formMeta.length > 0) {
                   setQuizMode(formMeta[0].quiz_mode || false);
                   setBranchingEnabled(formMeta[0].branching_enabled || false);
+                  localQuizMode = formMeta[0].quiz_mode || false;
                 }
               }
               // Fetch sections
@@ -135,7 +157,7 @@ export function PresensiSession() {
               // Fetch fields
               const fieldRes = await fetch(`${url}/rest/v1/form_fields?form_id=eq.${s.form_id}&order=order_index.asc`, { headers, signal: AbortSignal.timeout(15000) });
               const fieldData = fieldRes.ok ? await fieldRes.json() : [];
-              const mappedFields: FormField[] = fieldData.map((f: any) => ({
+              localMappedFields = fieldData.map((f: any) => ({
                 id: f.id,
                 type: f.type,
                 label: f.label,
@@ -153,8 +175,32 @@ export function PresensiSession() {
                 correctAnswer: f.correct_answer || undefined,
                 points: f.points ?? undefined,
               }));
-              setFormFields(mappedFields);
+              setFormFields(localMappedFields);
             }
+          }
+        }
+
+        // 1.5 Fetch scores dynamically if quiz mode
+        let scoresMap: Record<string, number | null> = {};
+        if (localFormId && localQuizMode && localMappedFields.length > 0) {
+          const scoreRes = await fetch(`${url}/rest/v1/form_responses?form_id=eq.${localFormId}&select=user_id,answers`, { headers, signal: AbortSignal.timeout(15000) });
+          if (scoreRes.ok) {
+            const scoreData = await scoreRes.json();
+            scoreData.forEach((r: any) => {
+              const answers = r.answers || {};
+              let score = 0;
+              localMappedFields.forEach((f: any) => {
+                if (f.correctAnswer != null && f.points) {
+                  const correct = Array.isArray(f.correctAnswer) ? f.correctAnswer : [f.correctAnswer];
+                  const rawAns = answers[f.id];
+                  const ans = Array.isArray(rawAns) ? rawAns : rawAns != null ? [rawAns] : [];
+                  if (correct.length > 0 && ans.length === correct.length && correct.every((c: any) => ans.includes(c))) {
+                    score += f.points;
+                  }
+                }
+              });
+              scoresMap[r.user_id] = score;
+            });
           }
         }
 
@@ -172,7 +218,8 @@ export function PresensiSession() {
           name: r.profiles?.full_name || "Unknown",
           nim: r.profiles?.nim || null,
           email: r.profiles?.email || "Unknown",
-          hadir: attendedUserIds.has(r.user_id)
+          hadir: attendedUserIds.has(r.user_id),
+          score: scoresMap[r.user_id] ?? null
         }));
         setAttendees(mappedAttendees);
       } catch (err) {
@@ -212,6 +259,7 @@ export function PresensiSession() {
     return () => clearInterval(interval);
   }, [useAutoSchedule, autoOpenDate, autoOpenTime, autoCloseDate, autoCloseTime, isOpen]);
 
+  /** Simpan jadwal auto-open dan auto-close sesi presensi. */
   const handleSaveSchedule = async () => {
     if (!session?.access_token) return;
     setSavingSchedule(true);
@@ -243,6 +291,10 @@ export function PresensiSession() {
   const qrValue = qrToken;
 
   // Save form to DB
+  /**
+   * Simpan form presensi (form_type='attendance') ke database.
+   * Insert form, sections, dan fields. Jika sudah ada form, update.
+   */
   const handleSaveForm = async () => {
     if (!session?.access_token) return;
     setSavingForm(true);
@@ -389,6 +441,7 @@ export function PresensiSession() {
   const attendanceCount = attendees.filter((a) => a.hadir).length;
   const totalRegistrants = attendees.length;
 
+  /** Toggle buka/tutup sesi presensi (is_open). */
   const handleToggleOpen = async () => {
     if (!session?.access_token) return;
     const newStatus = !isOpen;
@@ -411,6 +464,7 @@ export function PresensiSession() {
     }
   };
 
+  /** Toggle kehadiran manual per peserta (insert/delete attendance_records). */
   const handleToggleAttendance = async (attendeeId: string) => {
     if (sessionMethod !== "qr" || !session?.access_token) return;
     
@@ -451,6 +505,11 @@ export function PresensiSession() {
     }
   };
 
+  /**
+   * Export data kehadiran ke CSV.
+   * Menyertakan nama, NIM, email, status hadir, waktu hadir,
+   * dan skor quiz (jika form presensi menggunakan quiz mode).
+   */
   const handleExportPresensi = async () => {
     // Base columns
     const csvHeaders = ["Nama", "NIM", "Email", "Kategori", "Status Presensi"];
@@ -530,6 +589,119 @@ export function PresensiSession() {
     URL.revokeObjectURL(urlBlob);
   };
 
+  /**
+   * Export presensi spesifik untuk sesi ini ke PDF.
+   * Format sama dengan rekap presensi (Daftar Hadir), tapi hanya 1 sesi.
+   */
+  const handleExportPresensiPDF = async () => {
+    try {
+      const fetchHeaders: Record<string, string> = { "apikey": key };
+      if (session?.access_token) fetchHeaders["Authorization"] = `Bearer ${session.access_token}`;
+
+      // 1. Fetch event info
+      const evRes = await fetch(`${url}/rest/v1/events?id=eq.${id}&select=title,date,end_date,time_start,time_end,location`, { headers: fetchHeaders, signal: AbortSignal.timeout(15000) });
+      const evData = evRes.ok ? await evRes.json() : [];
+      const ev = evData[0] || {};
+
+      // 2. Sort attendees alphabetically
+      const sortedAttendees = [...attendees].sort((a, b) => a.name.localeCompare(b.name, "id"));
+
+      // 3. Generate PDF
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // — Judul —
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      const titleLine1 = "DAFTAR HADIR";
+      const titleLine2 = (ev.title || "").toUpperCase();
+      doc.text(titleLine1, pageWidth / 2, 20, { align: "center" });
+      doc.text(titleLine2, pageWidth / 2, 27, { align: "center" });
+
+      // — Info Kegiatan —
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      let infoY = 36;
+
+      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const formatFullDate = (dateStr: string) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        return `${dayNames[d.getDay()]}, ${d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+      };
+
+      const formatTime = (timeStr?: string) => {
+        if (!timeStr) return "";
+        const parts = timeStr.split("-").map(p => p.trim());
+        const fmt = (t: string) => {
+          if (!t) return "";
+          const split = t.split(":");
+          if (split.length < 2) return t;
+          let h = parseInt(split[0], 10);
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12;
+          h = h ? h : 12;
+          return `${h.toString().padStart(2, '0')}:${split[1].slice(0, 2)} ${ampm}`;
+        };
+        if (parts.length === 1) return fmt(parts[0]);
+        return `${fmt(parts[0])} - ${fmt(parts[1])}`;
+      };
+
+      let tanggalText = formatFullDate(ev.date) || "-";
+      if (ev.end_date && ev.end_date !== ev.date) tanggalText += ` - ${formatFullDate(ev.end_date)}`;
+      
+      let waktuText = formatTime(ev.time_start) || "-";
+      if (ev.time_end) waktuText += ` - ${formatTime(ev.time_end)}`;
+
+      const infoItems = [
+        ["Tanggal Kegiatan", tanggalText],
+        ["Nama Kegiatan", ev.title || "-"],
+        ["Waktu Kegiatan", waktuText],
+        ["Tempat", ev.location || "-"],
+        ["Sesi Presensi", sessionName],
+      ];
+
+      infoItems.forEach(([label, value]) => {
+        doc.setFont("helvetica", "bold");
+        doc.text(`${label}`, 14, infoY);
+        doc.setFont("helvetica", "normal");
+        doc.text(`: ${value}`, 55, infoY);
+        infoY += 6;
+      });
+
+      // — Tabel —
+      const tableHeaders = ["No", "Nama", "NIM", "Email", "Kehadiran"];
+      const tableBody = sortedAttendees.map((a, idx) => [
+        String(idx + 1),
+        a.name || "-",
+        a.nim || "-",
+        a.email || "-",
+        a.hadir ? "Hadir" : "-"
+      ]);
+
+      autoTable(doc, {
+        startY: infoY + 4,
+        head: [tableHeaders],
+        body: tableBody,
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2, halign: "center", font: "helvetica" },
+        headStyles: { fillColor: [255, 105, 0], textColor: 255, fontStyle: "bold", halign: "center" },
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          1: { halign: "left" },
+          2: { halign: "center", cellWidth: 30 },
+          3: { halign: "left" },
+          4: { halign: "center", cellWidth: 20 },
+        },
+      });
+
+      doc.save(`Daftar Hadir - ${sessionName}.pdf`);
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert("Gagal mengekspor PDF.");
+    }
+  };
+
   const inputClass = "w-full px-3 py-2 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none transition [color-scheme:light] dark:[color-scheme:dark]";
 
   if (loading) {
@@ -569,6 +741,10 @@ export function PresensiSession() {
           <button onClick={handleExportPresensi}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition">
             <Download className="w-3.5 h-3.5" /> Export CSV
+          </button>
+          <button onClick={handleExportPresensiPDF}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6900]/10 border border-[#ff6900]/20 text-[#ff6900] text-xs font-medium hover:bg-[#ff6900]/20 transition">
+            <FileDown className="w-3.5 h-3.5" /> Export PDF
           </button>
         </div>
       </div>
@@ -778,6 +954,16 @@ export function PresensiSession() {
                           {attendee.hadir ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                           {attendee.hadir ? "Hadir" : "Tidak Hadir"}
                         </span>
+                      )}
+                      {sessionMethod === "form" && attendee.hadir && quizMode && attendee.score !== undefined && attendee.score !== null && (
+                        <span className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400">
+                          Skor: {attendee.score}
+                        </span>
+                      )}
+                      {sessionMethod === "form" && attendee.hadir && (
+                        <button onClick={() => setViewingAnswers(attendee.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition">
+                          <FileText className="w-3.5 h-3.5" /> Lihat Jawaban
+                        </button>
                       )}
                     </div>
                   </div>

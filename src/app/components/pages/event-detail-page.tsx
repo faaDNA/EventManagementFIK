@@ -1,3 +1,12 @@
+/**
+ * @file event-detail-page.tsx
+ * @description Halaman detail kegiatan yang diakses dari beranda (route publik).
+ *
+ * Menampilkan informasi lengkap kegiatan: judul, deskripsi, tanggal, lokasi,
+ * cover image, status badge, kuota, sesi presensi, dan tombol pendaftaran.
+ * User harus login untuk mendaftar; jika belum login, redirect ke /login.
+ * Mendukung target audience (semua/mahasiswa) untuk pembatasan pendaftaran.
+ */
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { GlassCard } from "../glass-card";
@@ -6,6 +15,7 @@ import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { Calendar, MapPin, Users, ArrowLeft, CheckCircle2, Clock, Tag, CalendarX, Loader2, Sparkles, FileText, QrCode, ChevronDown, ChevronUp } from "lucide-react";
 import { formatDateRange } from "../utils";
 
+/** Format waktu dari HH:MM ke format 12-jam (AM/PM). */
 function formatTimeAMPM(start?: string | null, end?: string | null) {
   const format = (t: string) => {
     const [h, m] = t.split(":");
@@ -21,6 +31,7 @@ function formatTimeAMPM(start?: string | null, end?: string | null) {
   return `${s} - ${format(end)}`;
 }
 
+/** Komponen deskripsi yang bisa di-expand jika teks melebihi batas karakter. */
 const DESC_MAX = 300;
 function ExpandableText({ text }: { text: string | null }) {
   const [expanded, setExpanded] = React.useState(false);

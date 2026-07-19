@@ -3,7 +3,9 @@ import { useDrag, useDrop } from "react-dnd";
 
 const ITEM_TYPE = "FORM_FIELD";
 
-// ── Global Auto-Scroll ──
+/**
+ * Komponen pembantu untuk global auto-scroll saat drag mendekati tepi layar.
+ */
 export function GlobalAutoScroll() {
   const frameRef = useRef<number>(0);
   const mouseY = useRef(-1);
@@ -51,7 +53,10 @@ export function GlobalAutoScroll() {
   return null;
 }
 
-// ── Draggable Field (ID-based, bukan index-based) ──
+/**
+ * @description Wrapper draggable untuk tiap field form menggunakan react-dnd.
+ * Mendukung perpindahan posisi antar elemen maupun antar bagian form.
+ */
 interface DraggableFieldProps {
   id: string;
   moveField: (dragId: string, hoverId: string, placeBefore: boolean) => void;
@@ -99,7 +104,10 @@ export function DraggableField({ id, moveField, children }: DraggableFieldProps)
   );
 }
 
-// ── Drop zone untuk section (pindah antar section) ──
+/**
+ * @description Drop zone yang diletakkan di setiap section form.
+ * Memungkinkan pemindahan field (drop) ke section yang berbeda.
+ */
 interface SectionDropZoneProps {
   sectionId: string;
   onDropField: (fieldId: string, sectionId: string) => void;

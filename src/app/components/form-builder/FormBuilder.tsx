@@ -1,3 +1,12 @@
+/**
+ * @file FormBuilder.tsx
+ * @description Komponen utama pembuat form pendaftaran/presensi.
+ *
+ * Fitur:
+ * - Mendukung drag-and-drop (React-DnD) untuk reorder field dan pindah antar section.
+ * - Mode kuis (jawaban benar & poin) dan percabangan (goToSection).
+ * - Multi-section support (halaman form berbeda).
+ */
 import React, { useState, useCallback } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -55,7 +64,10 @@ export function FormBuilder({
     onFieldsChange(arr);
   };
 
-  // ID-based moveField — mendukung reorder dan pindah antar section
+  /** 
+   * Pindahkan posisi field (drag-and-drop).
+   * Menangani reorder di dalam section yang sama atau antar section.
+   */
   const moveField = useCallback((dragId: string, hoverId: string, placeBefore: boolean) => {
     if (dragId === hoverId) return;
     const dragIdx = fields.findIndex(f => f.id === dragId);
@@ -106,7 +118,7 @@ export function FormBuilder({
   const getFieldsForSection = (sectionId: string) =>
     fields.filter(f => f.sectionId === sectionId);
 
-  // Called when a field is dropped onto a section drop zone
+  /** Handler saat sebuah field di-drop ke drop zone suatu section. */
   const handleDropField = useCallback((fieldId: string, targetSectionId: string) => {
     const field = fields.find(f => f.id === fieldId);
     if (!field || field.sectionId === targetSectionId) return;

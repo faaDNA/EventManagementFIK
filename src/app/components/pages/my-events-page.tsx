@@ -1,3 +1,11 @@
+/**
+ * @file my-events-page.tsx
+ * @description Halaman "Kegiatan Saya" versi publik (di luar dashboard).
+ *
+ * Menggunakan mock data untuk menampilkan kegiatan yang didaftari user.
+ * Halaman ini merupakan versi awal sebelum migrasi ke Supabase —
+ * versi aktif yang digunakan user sekarang ada di kegiatan-saya.tsx (dashboard).
+ */
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import { EVENTS } from "../mock-data";

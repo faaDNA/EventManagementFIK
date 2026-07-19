@@ -1,3 +1,14 @@
+/**
+ * @file home-page.tsx
+ * @description Halaman beranda publik yang menampilkan daftar kegiatan aktif (published/ongoing).
+ *
+ * Fitur:
+ * - Fetch kegiatan dari Supabase beserta jumlah pendaftar via RPC
+ * - Filter berdasarkan kategori (Seminar, Workshop, Kompetisi, dll)
+ * - Pencarian berdasarkan judul kegiatan
+ * - Card kegiatan dengan cover image, kuota, status badge
+ * - Tampilan "Kuota Tidak Terbatas" untuk event tanpa batas kuota
+ */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../glass-card";
@@ -6,6 +17,7 @@ import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { useAuth } from "../auth-context";
 import { formatDateRange } from "../utils";
 
+/** Format waktu dari HH:MM ke format 12-jam (AM/PM). */
 function formatTimeAMPM(start?: string | null, end?: string | null) {
   const format = (t: string) => {
     const [h, m] = t.split(":");

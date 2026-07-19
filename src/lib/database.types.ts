@@ -124,6 +124,8 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   nim: string | null;
+  fakultas: string | null;
+  jurusan: string | null;
   ormawa_id: string | null;
   created_at: string;
   updated_at: string;
@@ -165,7 +167,7 @@ export interface Event {
   registration_close_date: string | null;
   registration_message: string | null;
   status: EventStatus;
-  has_presensi: boolean;
+  certificate_url: string | null;
   target_audience: "semua" | "mahasiswa";
   created_at: string;
   updated_at: string;

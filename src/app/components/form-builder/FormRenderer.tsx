@@ -1,3 +1,11 @@
+/**
+ * @file FormRenderer.tsx
+ * @description Komponen untuk merender form pendaftaran yang sudah jadi.
+ *
+ * Mengakomodasi pengisian form oleh pengguna (atau peserta event).
+ * Mendukung navigasi multi-bagian (multi-section) dan alur percabangan otomatis (goToSection).
+ * Terdapat validasi input dinamis sesuai konfigurasi field form.
+ */
 import React, { useState, useRef } from "react";
 import {
   Type, AlignLeft, CircleDot, CheckSquare, ChevronDown,

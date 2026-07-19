@@ -1,3 +1,15 @@
+/**
+ * @file signup-page.tsx
+ * @description Halaman registrasi akun baru dengan alur multi-step.
+ *
+ * Alur pendaftaran (3 step):
+ * 1. Email — input email, auto-detect mahasiswa dari domain @mahasiswa.upnvj.ac.id
+ * 2. Profil — input nama lengkap, NIM (read-only, auto-extract dari email mahasiswa)
+ * 3. Password — input password + konfirmasi, minimal 6 karakter
+ *
+ * Setelah submit, email verifikasi dikirim oleh Supabase Auth.
+ * Duplikasi email terdeteksi dari response identities kosong.
+ */
 import React, { useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../auth-context";
@@ -17,6 +29,8 @@ export function SignupPage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [nim, setNim] = useState("");
+  const [fakultas, setFakultas] = useState("");
+  const [jurusan, setJurusan] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -38,6 +52,7 @@ export function SignupPage() {
 
   // ── Step handlers ──────────────────────────────────────────────────────────
 
+  /** Step 1: Validasi email dan extract NIM jika email mahasiswa. */
   const handleEmailNext = () => {
     setError("");
     if (!email) { setError("Email wajib diisi"); return; }
@@ -46,13 +61,19 @@ export function SignupPage() {
     setStep("profile");
   };
 
+  /** Step 2: Validasi nama lengkap (dan NIM, Fakultas, Jurusan untuk mahasiswa). */
   const handleProfileNext = () => {
     setError("");
     if (!name.trim()) { setError("Nama wajib diisi"); return; }
-    if (isMahasiswa && !nim.trim()) { setError("NIM wajib diisi"); return; }
+    if (isMahasiswa) {
+      if (!nim.trim()) { setError("NIM wajib diisi"); return; }
+      if (!fakultas) { setError("Fakultas wajib dipilih"); return; }
+      if (!jurusan.trim()) { setError("Jurusan wajib diisi"); return; }
+    }
     setStep("password");
   };
 
+  /** Step 3: Validasi password, submit registrasi ke Supabase Auth. */
   const handleSignup = async () => {
     setError("");
     if (password.length < 6) { setError("Password minimal 6 karakter"); return; }
@@ -62,6 +83,8 @@ export function SignupPage() {
     const { error: err } = await signUp(email, password, {
       full_name: name.trim(),
       nim: isMahasiswa ? nim.trim() : undefined,
+      fakultas: isMahasiswa ? fakultas : undefined,
+      jurusan: isMahasiswa ? jurusan.trim() : undefined,
     });
     setLoading(false);
 
@@ -218,16 +241,45 @@ export function SignupPage() {
             </div>
 
             {isMahasiswa && (
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">NIM</label>
-                <input
-                  type="text"
-                  value={nim}
-                  readOnly
-                  className="w-full px-4 py-2.5 rounded-xl bg-muted/30 border border-border text-foreground/70 text-sm focus:outline-none cursor-not-allowed"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">NIM otomatis terdeteksi dari email</p>
-              </div>
+              <>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">NIM</label>
+                  <input
+                    type="text"
+                    value={nim}
+                    readOnly
+                    className="w-full px-4 py-2.5 rounded-xl bg-muted/30 border border-border text-foreground/70 text-sm focus:outline-none cursor-not-allowed"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">NIM otomatis terdeteksi dari email</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Fakultas</label>
+                  <select
+                    value={fakultas}
+                    onChange={(e) => setFakultas(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition"
+                  >
+                    <option value="">-- Pilih Fakultas --</option>
+                    <option value="FIK">Fakultas Ilmu Komputer (FIK)</option>
+                    <option value="FEB">Fakultas Ekonomi dan Bisnis (FEB)</option>
+                    <option value="FK">Fakultas Kedokteran (FK)</option>
+                    <option value="FT">Fakultas Teknik (FT)</option>
+                    <option value="FISIP">Fakultas Ilmu Sosial dan Ilmu Politik (FISIP)</option>
+                    <option value="FH">Fakultas Hukum (FH)</option>
+                    <option value="FIKES">Fakultas Ilmu Kesehatan (FIKES)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Jurusan</label>
+                  <input
+                    type="text"
+                    value={jurusan}
+                    onChange={(e) => setJurusan(e.target.value)}
+                    placeholder="Contoh: D3 Sistem Informasi atau S1 Sistem Informasi"
+                    className="w-full px-4 py-2.5 rounded-xl bg-input-background border border-border text-foreground text-sm focus:border-[#ff6900]/50 focus:outline-none focus:ring-2 focus:ring-[#ff6900]/10 transition placeholder:text-muted-foreground/40"
+                  />
+                </div>
+              </>
             )}
 
             {error && <p className="text-sm text-red-500">{error}</p>}

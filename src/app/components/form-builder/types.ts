@@ -1,3 +1,10 @@
+/**
+ * @file types.ts
+ * @description Definisi tipe data untuk sistem Form Builder.
+ * 
+ * Mencakup tipe untuk field form (teks, pilihan ganda, file, dll),
+ * validasi, autofill tag, dan konfigurasi kuis/percabangan.
+ */
 export type FieldType =
   | "text"
   | "textarea"
@@ -7,7 +14,7 @@ export type FieldType =
   | "linear_scale"
   | "file";
 
-export type AutofillTag = "nama" | "nim" | "akun" | null;
+export type AutofillTag = "nama" | "nim" | "akun" | "fakultas" | "jurusan" | null;
 
 export interface ValidationRule {
   type:

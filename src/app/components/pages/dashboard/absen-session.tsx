@@ -1,3 +1,13 @@
+/**
+ * @file absen-session.tsx
+ * @description Halaman presensi untuk pengguna (peserta event).
+ *
+ * Mendukung dua mode presensi:
+ * 1. QR Code: Peserta memindai QR Code ormawa melalui kamera perangkat (jsQR).
+ * 2. Form: Peserta mengisi form kehadiran (dengan dukungan draft auto-save).
+ * 
+ * Jika peserta menggunakan form, data form diupload, dan jawaban disimpan ke `form_responses`.
+ */
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { GlassCard } from "../../glass-card";
@@ -173,6 +183,7 @@ export function AbsenSession() {
   const formValuesRef = useRef(formValues);
   formValuesRef.current = formValues;
 
+  /** Fungsi simpan draft jawaban form ke localStorage. */
   const saveDraftNow = useCallback((valuesToSave?: Record<string, any>) => {
     if (!profile?.email || !sessionId) return;
     const data = valuesToSave || formValuesRef.current;
@@ -228,6 +239,7 @@ export function AbsenSession() {
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
   }, []);
 
+  /** Mulai kamera perangkat untuk memindai QR Code presensi. */
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -258,6 +270,7 @@ export function AbsenSession() {
     setScanning(false);
   };
 
+  /** Submit kehadiran via pemindaian QR Code (menyimpan ke attendance_records). */
   const submitAttendance = async () => {
     try {
       const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -333,6 +346,7 @@ export function AbsenSession() {
 
   useEffect(() => { return () => stopCamera(); }, []);
 
+  /** Submit kehadiran via form pengisian, termasuk pengunggahan file jawaban (jika ada). */
   const handleSubmitForm = async () => {
     setSubmitting(true);
     try {

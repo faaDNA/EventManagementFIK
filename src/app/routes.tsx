@@ -20,6 +20,7 @@ import { DashboardDaftarOrmawa } from "./components/pages/dashboard/daftar-ormaw
 import { DashboardEventDetail } from "./components/pages/dashboard/event-detail";
 import { DashboardEventRegister } from "./components/pages/dashboard/event-register";
 import { DashboardProfilePage } from "./components/pages/dashboard/profile-page";
+import { DashboardSertifikatSaya } from "./components/pages/dashboard/sertifikat-saya";
 
 export const router = createBrowserRouter([
   {
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
       { path: "event/:id", Component: DashboardEventDetail },
       { path: "event/:id/daftar", Component: DashboardEventRegister },
       { path: "profil", Component: DashboardProfilePage },
+      { path: "sertifikat", Component: DashboardSertifikatSaya },
     ],
   },
   {

@@ -1,3 +1,19 @@
+/**
+ * @file tambah-kegiatan.tsx
+ * @description Halaman pembuatan dan pengeditan kegiatan oleh ormawa (multi-step form).
+ *
+ * Alur 3 step:
+ * 1. Informasi Kegiatan — judul, deskripsi, kategori, tanggal, lokasi, kuota, cover image
+ * 2. Form Pendaftaran — menggunakan komponen FormBuilder untuk mendesain formulir
+ * 3. Pesan Pendaftar — pesan yang tampil setelah pendaftaran berhasil
+ *
+ * Fitur:
+ * - Simpan draft (status='draft') sebelum publish
+ * - Edit kegiatan yang sudah ada (load dari ?edit=ID)
+ * - Upload cover image ke Supabase Storage
+ * - Kategori Oprec: tanggal/lokasi opsional
+ * - Insert form, sections, dan fields ke database saat submit
+ */
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { GlassCard } from "../../glass-card";
@@ -52,6 +68,7 @@ export function DashboardTambahKegiatan() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(!!searchParams.get("draft") || !!searchParams.get("edit"));
 
+  /** Handler upload cover image — preview via FileReader. */
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -140,6 +157,12 @@ export function DashboardTambahKegiatan() {
   }, [draftId, session?.access_token]);
 
   // Save as draft (event only, minimal validation)
+  /**
+   * Simpan kegiatan sebagai draft (status='draft').
+   * Minimal validasi: hanya judul wajib diisi.
+   * Jika sudah ada draft (draftId), update; jika belum, insert baru.
+   * Juga menyimpan form fields dan sections ke database.
+   */
   const handleSaveDraft = async () => {
     if (!session?.user?.id || !profile?.ormawa_id) {
       setError("Login sebagai ormawa diperlukan.");
@@ -168,7 +191,6 @@ export function DashboardTambahKegiatan() {
         registration_message: registrationMessage.trim() || null,
         target_audience: targetAudience,
         status: "draft",
-        has_presensi: false,
       };
 
       let eventId = draftId;
@@ -273,6 +295,7 @@ export function DashboardTambahKegiatan() {
     }
   };
 
+  /** Validasi step 1 sebelum lanjut ke form builder. */
   const handleStep1Next = () => {
     setError("");
     if (!title.trim()) { setError("Judul kegiatan wajib diisi"); return; }
@@ -284,6 +307,10 @@ export function DashboardTambahKegiatan() {
     setStep(2);
   };
 
+  /**
+   * Submit kegiatan final (status='published').
+   * Validasi lengkap, upload cover, insert event + form + fields ke database.
+   */
   const handleSubmit = async () => {
     console.log("[TambahKegiatan] handleSubmit called");
     console.log("[TambahKegiatan] session:", session?.user?.id);
@@ -354,7 +381,6 @@ export function DashboardTambahKegiatan() {
         registration_close_date: closeDate,
         registration_message: registrationMessage.trim() || null,
         target_audience: targetAudience,
-        has_presensi: false,
       };
       if (!isEditMode) {
         eventData.status = "published";

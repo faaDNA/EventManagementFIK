@@ -1,3 +1,12 @@
+/**
+ * @file dashboard-layout.tsx
+ * @description Layout utama untuk halaman dashboard (admin, ormawa, dan pengguna umum).
+ *
+ * Menangani:
+ * - Proteksi route (redirect ke /login jika tidak ada session).
+ * - Sidebar navigasi yang disesuaikan berdasarkan peran pengguna (role).
+ * - Fitur logout, toggle tema (dark/light), dan navigasi kembali ke beranda publik.
+ */
 import React, { useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { useAuth } from "./auth-context";
@@ -5,7 +14,7 @@ import { useTheme } from "./theme-context";
 import {
   Flame, LogOut, ChevronDown, Sun, Moon, Menu,
   CalendarDays, LayoutDashboard, Building2, History,
-  FolderOpen, PlusCircle, Briefcase, Loader2, User, Home
+  FolderOpen, PlusCircle, Briefcase, Loader2, User, Home, Award
 } from "lucide-react";
 
 interface SidebarItem {
@@ -14,6 +23,10 @@ interface SidebarItem {
   icon: React.ReactNode;
 }
 
+/** 
+ * Fungsi pembantu untuk mengambil menu navigasi sidebar 
+ * berdasarkan role yang sedang login.
+ */
 function getSidebarItems(role: string): SidebarItem[] {
   switch (role) {
     case "admin":
@@ -34,6 +47,7 @@ function getSidebarItems(role: string): SidebarItem[] {
       return [
         { label: "Kegiatan", path: "/dashboard/kegiatan", icon: <CalendarDays className="w-5 h-5" /> },
         { label: "Kegiatan Saya", path: "/dashboard/kegiatan-saya", icon: <Briefcase className="w-5 h-5" /> },
+        { label: "Sertifikat Saya", path: "/dashboard/sertifikat", icon: <Award className="w-5 h-5" /> },
         { label: "Riwayat Kegiatan", path: "/dashboard/riwayat", icon: <History className="w-5 h-5" /> },
       ];
   }

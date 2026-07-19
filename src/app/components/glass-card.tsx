@@ -1,3 +1,9 @@
+/**
+ * @file glass-card.tsx
+ * @description Komponen UI dasar untuk kartu (card) bergaya glassmorphism.
+ * 
+ * Memberikan efek latar belakang blur (backdrop-filter) dengan border tipis dan efek hover interaktif.
+ */
 import React, { ReactNode } from "react";
 
 export function GlassCard({ children, className = "", onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {

@@ -1,3 +1,13 @@
+/**
+ * @file kegiatan-saya.tsx
+ * @description Halaman "Kegiatan Saya" di dashboard — menampilkan kegiatan yang sudah didaftari user.
+ *
+ * Fitur:
+ * - Fetch pendaftaran user dari tabel event_registrations + join events dan ormawa
+ * - Tampilkan status presensi per sesi (hadir/belum) dengan ikon QR/Form
+ * - Navigasi ke halaman presensi (scan QR / isi form) langsung dari card
+ * - Paginasi dan loading skeleton
+ */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
@@ -14,6 +24,7 @@ interface RegisteredEvent extends Event {
   registrations_count?: number;
 }
 
+/** Format tanggal ke format Indonesia (contoh: "1 Januari 2026"). */
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }

@@ -1,11 +1,23 @@
+/**
+ * @file event-detail.tsx
+ * @description Halaman detail kegiatan di dalam dashboard (untuk user yang sudah login).
+ *
+ * Fitur:
+ * - Informasi lengkap kegiatan (judul, deskripsi, tanggal, lokasi, kuota)
+ * - Tombol daftar dengan validasi kuota, deadline, dan target audience
+ * - Daftar sesi presensi yang bisa di-scan QR atau isi form
+ * - Status badge dinamis berdasarkan tanggal dan status event
+ * - Hapus pendaftaran (untuk event yang belum berlangsung)
+ */
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { GlassCard } from "../../glass-card";
 import { useAuth } from "../../auth-context";
 import { ImageWithFallback } from "../../figma/ImageWithFallback";
-import { Calendar, MapPin, Users, ArrowLeft, CheckCircle2, Clock, Tag, CalendarX, Loader2, QrCode, FileText, ScanLine, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, MapPin, Users, ArrowLeft, CheckCircle2, Clock, Tag, CalendarX, Loader2, QrCode, FileText, ScanLine, Trash2, ChevronDown, ChevronUp, Download } from "lucide-react";
 import type { Event } from "../../../../lib/database.types";
 
+/** Format rentang tanggal ke Bahasa Indonesia. */
 function formatDateRange(date: string, endDate?: string | null) {
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
   const start = new Date(date).toLocaleDateString("id-ID", opts);
@@ -14,6 +26,7 @@ function formatDateRange(date: string, endDate?: string | null) {
   return `${start} – ${end}`;
 }
 
+/** Format waktu dari HH:MM ke format 12-jam (AM/PM). */
 function formatTimeAMPM(start?: string | null, end?: string | null) {
   const format = (t: string) => {
     const [h, m] = t.split(":");
@@ -63,7 +76,6 @@ export function DashboardEventDetail() {
   const [event, setEvent] = useState<EventWithOrmawa | null>(null);
   const [loading, setLoading] = useState(true);
   const [registered, setRegistered] = useState(fromKegiatanSaya);
-  const [registrantCount, setRegistrantCount] = useState(0);
   const [registrationsCount, setRegistrationsCount] = useState(0);
   const [sessions, setSessions] = useState<any[]>([]);
   const [myAttendedSessions, setMyAttendedSessions] = useState<Set<string>>(new Set());
@@ -108,7 +120,6 @@ export function DashboardEventDetail() {
         );
         if (regRes.ok) {
           const count = await regRes.json();
-          setRegistrantCount(count);
           setRegistrationsCount(count);
         }
 
@@ -235,7 +246,7 @@ export function DashboardEventDetail() {
                   const isOprec = event.category === "Oprec";
                   const isClosed = (event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) || (event.quota !== null && registrationsCount >= event.quota);
                   
-                  let text = event.status;
+                  let text: string = event.status;
                   let bg = "bg-white/20 text-white/70";
                   
                   if (isActuallyOngoing && !isOprec) {
@@ -312,8 +323,15 @@ export function DashboardEventDetail() {
             </div>
 
             {registered ? (
-              <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
-                <CheckCircle2 className="w-5 h-5" /> Terdaftar
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
+                  <CheckCircle2 className="w-5 h-5" /> Terdaftar
+                </div>
+                {event.certificate_url && (
+                  <button onClick={() => window.open(event.certificate_url as string, '_blank')} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-600 dark:text-purple-400 font-semibold text-sm hover:bg-purple-100 dark:hover:bg-purple-500/20 transition shadow-sm">
+                    <Download className="w-5 h-5" /> Unduh Sertifikat
+                  </button>
+                )}
               </div>
             ) : isStudentOrPublic ? (
               (event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) ? (

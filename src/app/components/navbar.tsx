@@ -1,3 +1,13 @@
+/**
+ * @file navbar.tsx
+ * @description Komponen bilah navigasi (Navbar) untuk halaman publik (beranda, login, dsb).
+ *
+ * Menampilkan:
+ * - Logo dan navigasi ke beranda
+ * - Tombol Login/Register jika belum login
+ * - Menu dropdown profil jika sudah login (menuju Dashboard atau Logout)
+ * - Toggle tema (dark/light mode)
+ */
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "./auth-context";

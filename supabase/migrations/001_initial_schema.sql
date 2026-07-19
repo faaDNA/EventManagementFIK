@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   role        TEXT NOT NULL DEFAULT 'umum'
                 CHECK (role IN ('mahasiswa', 'umum', 'ormawa', 'admin')),
   nim         TEXT,                    -- hanya untuk role mahasiswa
+  fakultas    TEXT,                    -- hanya untuk role mahasiswa
+  jurusan     TEXT,                    -- hanya untuk role mahasiswa
   ormawa_id   UUID REFERENCES ormawa(id) ON DELETE SET NULL,  -- hanya untuk role ormawa
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW()
@@ -57,13 +59,15 @@ CREATE TRIGGER profiles_updated_at
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, role, nim, ormawa_id)
+  INSERT INTO public.profiles (id, email, full_name, role, nim, fakultas, jurusan, ormawa_id)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'role', 'umum'),
     NEW.raw_user_meta_data->>'nim',
+    NEW.raw_user_meta_data->>'fakultas',
+    NEW.raw_user_meta_data->>'jurusan',
     CASE
       WHEN NEW.raw_user_meta_data->>'ormawa_id' IS NOT NULL
       THEN (NEW.raw_user_meta_data->>'ormawa_id')::UUID
@@ -104,7 +108,7 @@ CREATE TABLE IF NOT EXISTS events (
                             'draft','published','ongoing',
                             'completed','cancelled'
                           )),
-  has_presensi            BOOLEAN DEFAULT FALSE,
+  certificate_url         TEXT DEFAULT NULL,
   target_audience         TEXT DEFAULT 'semua' CHECK (target_audience IN ('semua', 'mahasiswa')),
   created_at              TIMESTAMPTZ DEFAULT NOW(),
   updated_at              TIMESTAMPTZ DEFAULT NOW()
@@ -526,3 +530,56 @@ ON CONFLICT DO NOTHING;
 -- 4. Simpan URL tersebut ke kolom database (avatar_url, logo_url, cover_url)
 -- 5. Saat tampilkan, gunakan URL itu langsung di <img src={url} />
 -- ============================================================
+
+-- ============================================================
+-- ATOMIC REGISTRATION FUNCTION
+-- Cek kuota + insert dalam 1 transaction (mencegah race condition)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION register_for_event(p_event_id UUID, p_user_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_quota INTEGER;
+  v_count INTEGER;
+  v_reg_id UUID;
+  v_close_date DATE;
+  v_status TEXT;
+BEGIN
+  -- 1. Ambil data event
+  SELECT quota, registration_close_date, status
+  INTO v_quota, v_close_date, v_status
+  FROM events WHERE id = p_event_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Event tidak ditemukan' USING ERRCODE = 'P0001';
+  END IF;
+
+  -- 2. Cek status event
+  IF v_status NOT IN ('published', 'ongoing') THEN
+    RAISE EXCEPTION 'Event tidak menerima pendaftaran' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- 3. Cek deadline
+  IF v_close_date IS NOT NULL AND CURRENT_DATE > v_close_date THEN
+    RAISE EXCEPTION 'Masa pendaftaran sudah ditutup' USING ERRCODE = 'P0003';
+  END IF;
+
+  -- 4. Cek kuota (atomic — dalam 1 transaction, mencegah race condition)
+  IF v_quota IS NOT NULL THEN
+    SELECT COUNT(*) INTO v_count
+    FROM event_registrations
+    WHERE event_id = p_event_id AND status != 'cancelled';
+
+    IF v_count >= v_quota THEN
+      RAISE EXCEPTION 'Kuota pendaftaran sudah penuh' USING ERRCODE = 'P0004';
+    END IF;
+  END IF;
+
+  -- 5. Insert registration
+  INSERT INTO event_registrations (event_id, user_id, status)
+  VALUES (p_event_id, p_user_id, 'confirmed')
+  RETURNING id INTO v_reg_id;
+
+  RETURN v_reg_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

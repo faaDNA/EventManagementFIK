@@ -1,3 +1,16 @@
+/**
+ * @file reset-password-page.tsx
+ * @description Halaman reset password — diakses dari link yang dikirim via email.
+ *
+ * Alur:
+ * 1. User klik link reset di email → Supabase meng-inject session dari URL hash
+ * 2. Halaman ini menunggu session tersedia (timeout 2 detik)
+ * 3. User memasukkan password baru + konfirmasi
+ * 4. Password diupdate via `updatePassword()` dari auth-context
+ * 5. Redirect ke /dashboard setelah berhasil
+ *
+ * Jika link expired/invalid → tampilkan pesan error.
+ */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../auth-context";
@@ -26,6 +39,10 @@ export function ResetPasswordPage() {
     return () => clearTimeout(timer);
   }, [session]);
 
+  /**
+   * Submit password baru. Validasi: minimal 6 karakter, konfirmasi harus cocok.
+   * Setelah berhasil, redirect ke /dashboard setelah 1 detik.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

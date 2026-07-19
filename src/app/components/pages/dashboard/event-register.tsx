@@ -1,3 +1,15 @@
+/**
+ * @file event-register.tsx
+ * @description Halaman pendaftaran kegiatan — menampilkan form pendaftaran dan memproses submit.
+ *
+ * Alur:
+ * 1. Fetch data event dan form registration dari Supabase
+ * 2. Render form menggunakan komponen FormRenderer
+ * 3. Autofill field nama/NIM/email dari profil user
+ * 4. Simpan draft jawaban ke localStorage (otomatis restore saat kembali)
+ * 5. Submit: panggil RPC `register_for_event` (atomic) + simpan form_responses
+ * 6. Tampilkan pesan sukses dengan registration_message dari event
+ */
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
@@ -102,6 +114,8 @@ export function DashboardEventRegister() {
           if (f.autofillTag === "nama") initial[f.id] = profile?.full_name || "";
           else if (f.autofillTag === "akun") initial[f.id] = profile?.email || "";
           else if (f.autofillTag === "nim") initial[f.id] = profile?.nim || "";
+          else if (f.autofillTag === "fakultas") initial[f.id] = profile?.fakultas || "";
+          else if (f.autofillTag === "jurusan") initial[f.id] = profile?.jurusan || "";
           else initial[f.id] = "";
         });
 

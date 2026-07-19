@@ -1,4 +1,16 @@
-import React, { useEffect, useState } from "react";
+/**
+ * @file kegiatan.tsx
+ * @description Halaman "Daftar Kegiatan" di dashboard — menampilkan semua kegiatan aktif.
+ *
+ * Fitur:
+ * - Fetch kegiatan published/ongoing dari Supabase
+ * - Filter kategori multi-select dan pencarian judul
+ * - Status badge dinamis (Dibuka, Berlangsung, Ditutup, Selesai)
+ * - Deteksi kegiatan ongoing berdasarkan tanggal real-time
+ * - Paginasi dengan SimplePagination
+ * - Target audience filter (semua/mahasiswa)
+ */
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
 import { Search, MapPin, Calendar, Users, ArrowRight, Filter, CalendarX } from "lucide-react";
@@ -10,6 +22,7 @@ import type { Event } from "../../../../lib/database.types";
 
 const CATEGORIES = ["Semua", "Seminar", "Workshop", "Kompetisi", "Oprec", "Pelatihan", "Lainnya"];
 
+/** Format rentang tanggal ke format "1 Januari 2026" atau "1 – 3 Januari 2026". */
 function formatDateRange(date: string, endDate?: string | null) {
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
   const start = new Date(date).toLocaleDateString("id-ID", opts);
@@ -218,7 +231,7 @@ export function DashboardKegiatan() {
 
                       const isClosed = (event.registration_close_date && new Date(new Date().setHours(0,0,0,0)) > new Date(event.registration_close_date)) || (event.quota !== null && (event.registrations_count || 0) >= event.quota);
                       
-                      let text = event.status;
+                      let text: string = event.status;
                       let bg = "bg-black/50";
                       
                       const isOprec = event.category === "Oprec";

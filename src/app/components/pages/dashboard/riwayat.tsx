@@ -1,3 +1,13 @@
+/**
+ * @file riwayat.tsx
+ * @description Halaman "Riwayat Kegiatan" di dashboard — menampilkan kegiatan yang sudah selesai.
+ *
+ * Fitur:
+ * - Fetch kegiatan dengan status 'completed' dari Supabase
+ * - Pencarian berdasarkan judul dan filter kategori
+ * - Status badge dan tampilan informasi kegiatan
+ * - Paginasi dengan SimplePagination
+ */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { GlassCard } from "../../glass-card";
@@ -6,6 +16,7 @@ import { Calendar, MapPin, Users, Search, Filter, X, Clock, ArrowRight } from "l
 import { SimplePagination } from "../../simple-pagination";
 import { EventListSkeletonList } from "../../loading-skeleton";
 
+/** Format rentang tanggal ke Bahasa Indonesia. */
 function formatDateRange(date: string, endDate?: string | null) {
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
   const start = new Date(date).toLocaleDateString("id-ID", opts);
@@ -14,6 +25,7 @@ function formatDateRange(date: string, endDate?: string | null) {
   return `${start} – ${end}`;
 }
 
+/** Format waktu dari HH:MM ke format 12-jam (AM/PM). */
 function formatTimeAMPM(start?: string | null, end?: string | null) {
   const format = (t: string) => {
     const [h, m] = t.split(":");

@@ -1,3 +1,14 @@
+/**
+ * @file login-page.tsx
+ * @description Halaman login untuk masuk ke aplikasi OrmawaEvent FIK.
+ *
+ * Mendukung dua metode login:
+ * 1. Email + Password — form input dengan validasi dan error handling
+ * 2. Google OAuth — redirect ke Google, lalu kembali ke /dashboard
+ *
+ * Jika user sudah login (session & profile ada), otomatis redirect ke /dashboard.
+ * Error message dari Supabase di-translate ke Bahasa Indonesia.
+ */
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../auth-context";
@@ -31,6 +42,10 @@ export function LoginPage() {
     };
   }, [session, profile, navigate]);
 
+  /**
+   * Handler submit form login email/password.
+   * Menerjemahkan pesan error Supabase ke Bahasa Indonesia.
+   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -62,6 +77,11 @@ export function LoginPage() {
     }
   };
 
+  /**
+   * Handler login via Google OAuth.
+   * Setelah redirect berhasil, browser akan kembali ke /dashboard.
+   * Jika user membatalkan popup, loading state di-reset via focus listener.
+   */
   const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);

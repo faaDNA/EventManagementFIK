@@ -1,3 +1,17 @@
+/**
+ * @file auth-context.tsx
+ * @description Context provider pusat untuk autentikasi dan manajemen sesi.
+ *
+ * Fitur utama:
+ * - Login email/password dan Google OAuth
+ * - Registrasi dengan deteksi email duplikat
+ * - Reset & update password
+ * - Auto-logout setelah 12 jam (keamanan device publik kampus)
+ * - Auto-patch profil mahasiswa untuk Google OAuth (NIM & role)
+ * - Update profil (edit nama)
+ *
+ * Digunakan oleh seluruh aplikasi melalui hook `useAuth()`.
+ */
 import {
   createContext,
   useContext,
@@ -25,7 +39,7 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    meta: { full_name: string; nim?: string; role?: string }
+    meta: { full_name: string; nim?: string; role?: string; fakultas?: string; jurusan?: string }
   ) => Promise<{ error: string | null }>;
   /** Google OAuth – redirects back to /dashboard */
   signInWithGoogle: () => Promise<{ error: string | null }>;
@@ -33,8 +47,8 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   /** Update Password (after following reset link) */
   updatePassword: (password: string) => Promise<{ error: string | null }>;
-  /** Update Profile (e.g. full_name) */
-  updateProfile: (data: { full_name: string }) => Promise<{ error: string | null }>;
+  /** Update Profile (e.g. full_name, fakultas, jurusan) */
+  updateProfile: (data: { full_name?: string; fakultas?: string; jurusan?: string }) => Promise<{ error: string | null }>;
   /** Sign out */
   signOut: () => Promise<void>;
 }
@@ -61,18 +75,21 @@ const AuthContext = createContext<AuthContextType>({
 const MAX_SESSION_MS = 12 * 60 * 60 * 1000; // 12 jam
 const LOGIN_TS_KEY = "login_timestamp";
 
+/** Cek apakah sesi sudah melewati batas 12 jam sejak login. */
 function isSessionExpired(): boolean {
   const ts = localStorage.getItem(LOGIN_TS_KEY);
   if (!ts) return false;
   return Date.now() - parseInt(ts, 10) > MAX_SESSION_MS;
 }
 
+/** Catat waktu login ke localStorage (hanya jika belum ada). */
 function stampLoginTime(): void {
   if (!localStorage.getItem(LOGIN_TS_KEY)) {
     localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
   }
 }
 
+/** Hapus timestamp login dari localStorage saat logout. */
 function clearLoginTime(): void {
   localStorage.removeItem(LOGIN_TS_KEY);
 }
@@ -84,6 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Ambil data profil user dari tabel `profiles` via REST API.
+   * Menggunakan fetch langsung (bukan supabase-js) untuk menghindari
+   * masalah RLS timing saat session baru dibuat.
+   * @param userId - UUID user dari Supabase Auth
+   * @param token - Access token (opsional, akan diambil dari session jika kosong)
+   * @returns Data profil atau null jika tidak ditemukan/error
+   */
   async function fetchProfile(userId: string, token?: string): Promise<Profile | null> {
     try {
       const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -292,6 +317,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Sign In ────────────────────────────────────────────────────────────────
 
+  /**
+   * Login dengan email dan password.
+   * Setelah berhasil: catat waktu login, fetch profil, set state.
+   * Jika profil tidak ditemukan di database → logout paksa + error.
+   */
   async function signIn(
     email: string,
     password: string
@@ -317,10 +347,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Sign Up ───────────────────────────────────────────────────────────────
 
+  /**
+   * Registrasi akun baru dengan email dan password.
+   * - Validasi password minimal 6 karakter dan nama tidak kosong
+   * - Auto-detect role mahasiswa dari domain email @mahasiswa.upnvj.ac.id
+   * - Deteksi email duplikat via identities kosong (Supabase behavior)
+   * - Upsert profil ke tabel `profiles` sebagai fallback trigger
+   * @param meta - Data tambahan: nama lengkap, NIM (opsional), role (opsional)
+   */
   async function signUp(
     email: string,
     password: string,
-    meta: { full_name: string; nim?: string; role?: string }
+    meta: { full_name: string; nim?: string; role?: string; fakultas?: string; jurusan?: string }
   ): Promise<{ error: string | null }> {
     // ── Validasi password ──
     if (password.length < 6) {
@@ -340,6 +378,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           full_name: meta.full_name,
           nim: meta.nim ?? null,
+          fakultas: meta.fakultas ?? null,
+          jurusan: meta.jurusan ?? null,
           role: assignedRole,
         },
       },
@@ -362,6 +402,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: meta.full_name,
         role: assignedRole,
         nim: meta.nim ?? null,
+        fakultas: meta.fakultas ?? null,
+        jurusan: meta.jurusan ?? null,
         ormawa_id: null,
       } as any);
     }
@@ -371,6 +413,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Google OAuth ──────────────────────────────────────────────────────────
 
+  /**
+   * Login via Google OAuth. Redirect ke halaman Google, lalu kembali ke /dashboard.
+   * Profil otomatis dibuat oleh trigger `handle_new_user()` di database.
+   * NIM & role di-patch oleh `ensureProfileComplete()` saat kembali.
+   */
   async function signInWithGoogle(): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -383,6 +430,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Reset Password ────────────────────────────────────────────────────────
 
+  /**
+   * Kirim email reset password ke alamat yang diberikan.
+   * Link di email akan mengarah ke halaman /reset-password.
+   */
   async function resetPassword(email: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
@@ -390,6 +441,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
+  /**
+   * Update password user yang sedang login (dipanggil dari halaman reset password
+   * setelah user mengklik link di email).
+   */
   async function updatePassword(password: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.updateUser({ password });
     return { error: error?.message ?? null };
@@ -397,7 +452,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Update Profile ────────────────────────────────────────────────────────
 
-  async function updateProfile(data: { full_name: string }): Promise<{ error: string | null }> {
+  async function updateProfile(data: { full_name?: string; fakultas?: string; jurusan?: string }): Promise<{ error: string | null }> {
     if (!session?.user?.id || !session?.access_token) return { error: "Belum login." };
     try {
       const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -428,6 +483,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Sign Out ──────────────────────────────────────────────────────────────
 
+  /**
+   * Logout: hapus timestamp, clear state secara optimistic, lalu signOut Supabase.
+   * signOut dijalankan non-blocking untuk menghindari hang di Windows.
+   */
   async function signOut(): Promise<void> {
     try {
       // Hapus timestamp login
@@ -455,4 +514,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+/** Hook untuk mengakses state dan fungsi autentikasi dari komponen manapun. */
 export const useAuth = () => useContext(AuthContext);
