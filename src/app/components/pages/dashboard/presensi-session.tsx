@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addPengesahanBlock, addFooterTimestamp } from "../../../../lib/pdf-utils";
 import { FormBuilder } from "../../form-builder/FormBuilder";
 import { FormRenderer } from "../../form-builder/FormRenderer";
 import type { FormField, FormSection } from "../../form-builder/types";
@@ -38,7 +39,7 @@ interface Attendee {
 export function PresensiSession() {
   const { id, sessionId } = useParams();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [sessionName, setSessionName] = useState("");
@@ -694,6 +695,20 @@ export function PresensiSession() {
           4: { halign: "center", cellWidth: 20 },
         },
       });
+
+      // Ambil nama ormawa untuk pengesahan
+      let ormawaName = "";
+      if (profile?.ormawa_id) {
+        const ormawaRes = await fetch(`${url}/rest/v1/ormawa?id=eq.${profile.ormawa_id}&select=name`, { headers: fetchHeaders });
+        if (ormawaRes.ok) {
+          const oData = await ormawaRes.json();
+          if (oData.length > 0) ormawaName = oData[0].name;
+        }
+      }
+
+      // Footer & Pengesahan
+      addPengesahanBlock(doc, ormawaName, false);
+      addFooterTimestamp(doc, false);
 
       doc.save(`Daftar Hadir - ${sessionName}.pdf`);
     } catch (err) {

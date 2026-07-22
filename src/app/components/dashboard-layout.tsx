@@ -14,7 +14,7 @@ import { useTheme } from "./theme-context";
 import {
   Flame, LogOut, ChevronDown, Sun, Moon, Menu,
   CalendarDays, LayoutDashboard, Building2, History,
-  FolderOpen, PlusCircle, Briefcase, Loader2, User, Home, Award
+  FolderOpen, PlusCircle, Briefcase, Loader2, User, Home, Award, FileDown
 } from "lucide-react";
 
 interface SidebarItem {
@@ -42,6 +42,7 @@ function getSidebarItems(role: string): SidebarItem[] {
         { label: "Kegiatan Kami", path: "/dashboard/kegiatan-kami", icon: <FolderOpen className="w-5 h-5" /> },
         { label: "Tambah Kegiatan", path: "/dashboard/tambah-kegiatan", icon: <PlusCircle className="w-5 h-5" /> },
         { label: "Riwayat Kegiatan", path: "/dashboard/riwayat", icon: <History className="w-5 h-5" /> },
+        { label: "Rekap Kegiatan", path: "/dashboard/rekap-kegiatan", icon: <FileDown className="w-5 h-5" /> },
       ];
     default: // mahasiswa & umum
       return [

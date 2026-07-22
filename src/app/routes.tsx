@@ -21,6 +21,7 @@ import { DashboardEventDetail } from "./components/pages/dashboard/event-detail"
 import { DashboardEventRegister } from "./components/pages/dashboard/event-register";
 import { DashboardProfilePage } from "./components/pages/dashboard/profile-page";
 import { DashboardSertifikatSaya } from "./components/pages/dashboard/sertifikat-saya";
+import { DashboardRekapKegiatan } from "./components/pages/dashboard/rekap-kegiatan";
 
 export const router = createBrowserRouter([
   {
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: "kegiatan-kami/:id/presensi/:sessionId", Component: PresensiSession },
       { path: "tambah-kegiatan", Component: DashboardTambahKegiatan },
       { path: "riwayat", Component: DashboardRiwayat },
+      { path: "rekap-kegiatan", Component: DashboardRekapKegiatan },
       { path: "analitik", Component: DashboardAnalitik },
       { path: "daftar-ormawa", Component: DashboardDaftarOrmawa },
       { path: "event/:id", Component: DashboardEventDetail },

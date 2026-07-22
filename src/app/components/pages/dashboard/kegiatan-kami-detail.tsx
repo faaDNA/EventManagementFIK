@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { FormRenderer } from "../../form-builder/FormRenderer";
 import type { FormField, FormSection } from "../../form-builder/types";
+import { addPengesahanBlock, addFooterTimestamp } from "../../../../lib/pdf-utils";
 
 /** Format rentang tanggal ke Bahasa Indonesia. */
 function formatDateRange(date: string, endDate?: string | null) {
@@ -84,7 +85,7 @@ interface SessionData {
 export function DashboardKegiatanKamiDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -642,6 +643,130 @@ export function DashboardKegiatanKamiDetail() {
     }
   };
 
+  /**
+   * Export data pendaftar ke file PDF sederhana.
+   * Hanya kolom: No, Nama, NIM, Email, Fakultas, Jurusan.
+   */
+  const handleExportPendaftarPDF = async () => {
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL as string;
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      const headers: Record<string, string> = { "apikey": key };
+      if (session?.access_token) headers["Authorization"] = `Bearer ${session.access_token}`;
+
+      // 1. Ambil data pendaftar
+      const res = await fetch(
+        `${url}/rest/v1/event_registrations?event_id=eq.${id}&select=profiles:user_id(full_name,nim,email,fakultas,jurusan)`,
+        { headers, signal: AbortSignal.timeout(15000) }
+      );
+      if (!res.ok) { console.error("Export fetch error"); return; }
+      const data = await res.json();
+
+      // 2. Ambil nama ormawa untuk pengesahan
+      let ormawaName = "";
+      if (profile?.ormawa_id) {
+        const ormawaRes = await fetch(`${url}/rest/v1/ormawa?id=eq.${profile.ormawa_id}&select=name`, { headers });
+        if (ormawaRes.ok) {
+          const oData = await ormawaRes.json();
+          if (oData.length > 0) ormawaName = oData[0].name;
+        }
+      }
+
+      // 3. Sort data berdasarkan nama
+      const sortedRegs = [...data].sort((a: any, b: any) => {
+        const nameA = (a.profiles?.full_name || "").toLowerCase();
+        const nameB = (b.profiles?.full_name || "").toLowerCase();
+        return nameA.localeCompare(nameB, "id");
+      });
+
+      // 4. Generate PDF
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Judul
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("DAFTAR PENDAFTAR", pageWidth / 2, 20, { align: "center" });
+      doc.text((event?.title || "").toUpperCase(), pageWidth / 2, 27, { align: "center" });
+
+      // Info Kegiatan
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      let infoY = 36;
+      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const formatFullDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return `${dayNames[d.getDay()]}, ${d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+      };
+      
+      let tanggalText = "-";
+      if (event?.date) {
+        tanggalText = formatFullDate(event.date);
+        if (event.end_date && event.end_date !== event.date) tanggalText += ` - ${formatFullDate(event.end_date)}`;
+      }
+      
+      const infoItems = [
+        ["Tanggal Kegiatan", tanggalText],
+        ["Nama Kegiatan", event?.title || "-"],
+        ["Tempat", event?.location || "-"],
+      ];
+
+      infoItems.forEach(([label, value]) => {
+        doc.setFont("helvetica", "bold");
+        doc.text(`${label}`, 14, infoY);
+        doc.setFont("helvetica", "normal");
+        doc.text(`: ${value}`, 50, infoY);
+        infoY += 6;
+      });
+
+      // Tabel
+      const tableHeaders = ["No", "Nama", "NIM", "Email", "Fakultas", "Jurusan"];
+      const tableBody = sortedRegs.map((r: any, i: number) => {
+        const p = r.profiles || {};
+        return [
+          String(i + 1),
+          p.full_name || "-",
+          p.nim || "-",
+          p.email || "-",
+          p.fakultas || "-",
+          p.jurusan || "-",
+        ];
+      });
+
+      autoTable(doc, {
+        startY: infoY + 4,
+        head: [tableHeaders],
+        body: tableBody,
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2, font: "helvetica" },
+        headStyles: { fillColor: [255, 105, 0], textColor: 255, fontStyle: "bold", halign: "center" },
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          1: { cellWidth: 50 },
+          2: { cellWidth: 25, halign: "center" },
+          3: { cellWidth: 40 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 30 },
+        },
+      });
+
+      // Total pendaftar
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total Pendaftar: ${sortedRegs.length} orang`, 14, finalY);
+
+      // Footer & Pengesahan
+      addPengesahanBlock(doc, ormawaName, false);
+      addFooterTimestamp(doc, false);
+
+      doc.save(`Daftar Pendaftar - ${event?.title || "Kegiatan"}.pdf`);
+    } catch (err) {
+      console.error("PDF Export error:", err);
+      alert("Gagal mengekspor PDF.");
+    }
+  };
+
+
   /** Membuka modal rekap presensi dan memuat data kehadiran. */
   const handleOpenRekapModal = async () => {
     if (!event || sessions.length === 0) return;
@@ -830,6 +955,20 @@ export function DashboardKegiatanKamiDetail() {
           3: { halign: "left", cellWidth: isLandscape ? 50 : 42 },
         },
       });
+
+      // Ambil nama ormawa untuk pengesahan
+      let ormawaName = "";
+      if (profile?.ormawa_id) {
+        const ormawaRes = await fetch(`${url}/rest/v1/ormawa?id=eq.${profile.ormawa_id}&select=name`, { headers });
+        if (ormawaRes.ok) {
+          const oData = await ormawaRes.json();
+          if (oData.length > 0) ormawaName = oData[0].name;
+        }
+      }
+
+      // Footer & Pengesahan
+      addPengesahanBlock(doc, ormawaName, isLandscape);
+      addFooterTimestamp(doc, isLandscape);
 
       // Save
       const fileName = `Daftar Hadir - ${event.title || "Kegiatan"}.pdf`;
@@ -1168,7 +1307,11 @@ export function DashboardKegiatanKamiDetail() {
               <div className="flex items-center gap-2">
                 <button onClick={handleExport}
                   className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition flex items-center gap-1.5 shrink-0">
-                  <Download className="w-3.5 h-3.5" /> CSV
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
+                </button>
+                <button onClick={handleExportPendaftarPDF}
+                  className="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-[11px] font-medium hover:bg-red-100 dark:hover:bg-red-500/20 transition flex items-center gap-1.5 shrink-0">
+                  <Download className="w-3.5 h-3.5" /> PDF
                 </button>
               </div>
             </div>
