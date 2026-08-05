@@ -394,8 +394,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // If email confirmation is disabled the user object is already present
+    // and we can upsert to profiles directly. If email confirmation is enabled,
+    // the user won't have a session yet → the trigger `handle_new_user()`
+    // on auth.users will create the profile row automatically when the
+    // user confirms their email. The metadata (fakultas, jurusan, etc.)
+    // is already stored in raw_user_meta_data from the signUp call above.
     const userId = data.user?.id;
-    if (userId) {
+    if (userId && data.session) {
+      // Session exists → email confirmation is disabled → upsert directly
       await supabase.from("profiles").upsert({
         id: userId,
         email,
@@ -405,7 +411,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fakultas: meta.fakultas ?? null,
         jurusan: meta.jurusan ?? null,
         ormawa_id: null,
-      } as any);
+      } as any).then(({ error: upsertErr }) => {
+        if (upsertErr) console.warn("Profile upsert warning:", upsertErr.message);
+      });
     }
 
     return { error: null };
