@@ -82,5 +82,8 @@ npm run dev
 ```
 Aplikasi kini siap diakses melalui browser di alamat [http://localhost:5173](http://localhost:5173).
 
+## 📄 Lisensi
+Proyek ini dilisensikan di bawah [MIT License](LICENSE). Kamu bebas untuk menggunakan, memodifikasi, dan mendistribusikan sistem ini. Sangat direkomendasikan penggunaannya untuk keperluan belajar pengembangan web.
+
 ---
-*Dibuat untuk Tugas Akhir D3 Sistem Informasi.*
+*Dibuat oleh **Daffa Naufal** untuk Tugas Akhir D3 Sistem Informasi (2026).*
